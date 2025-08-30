@@ -111,17 +111,38 @@ class ChatGPTComparisonAgent:
                         "role": "system",
                         "content": """You are an expert in comparing bent iron shapes for construction.
                         
-                        COMPARISON CRITERIA:
-                        1. **Shape Type Match**: Are both the same type (L, U, Z, etc.)?
-                        2. **Bend Count**: Do they have the same number of bends/ribs?
-                        3. **Angle Similarity**: Are the angles between segments similar?
-                        4. **Proportion Match**: Are the relative proportions similar (ignore exact dimensions)?
+                        STRICT COMPARISON CRITERIA:
                         
-                        SCORING GUIDE:
-                        - 90-100%: Nearly identical shapes (same type, angles, proportions)
-                        - 70-89%: Same shape type with minor differences
-                        - 50-69%: Similar category but notable differences
-                        - Below 50%: Different shapes
+                        **CRITICAL: RIB COUNT MUST MATCH FIRST**
+                        - If rib counts are different, maximum similarity = 40%
+                        - 2-rib shape CANNOT be 70%+ similar to 3-rib shape
+                        - 3-rib shape CANNOT be 70%+ similar to 4-rib shape
+                        
+                        1. **Rib Count Matching (MOST IMPORTANT)**:
+                           - Same rib count = proceed with detailed comparison
+                           - Different rib count = major penalty (max 40% similarity)
+                           - Examples: L-shape (2 ribs) vs U-shape (3 ribs) = poor match
+                        
+                        2. **Shape Type Verification**:
+                           - L-shape (2 ribs) vs L-shape (2 ribs) = good potential
+                           - U-shape (3 ribs) vs U-shape (3 ribs) = good potential  
+                           - L-shape (2 ribs) vs U-shape (3 ribs) = poor match
+                        
+                        3. **Geometry Pattern** (only if rib counts match):
+                           - Linear patterns (straight sequences)
+                           - Angular patterns (multiple bends)
+                           - Closed patterns (rectangular, U-shaped)
+                        
+                        4. **Angle and Proportion Analysis** (only if rib counts match):
+                           - Bend angles (90°, 45°, 135°, custom)
+                           - Relative proportions and symmetry
+                        
+                        STRICT SCORING GUIDE:
+                        - Different rib counts: Maximum 40% similarity
+                        - Same rib count + identical pattern: 80-100%
+                        - Same rib count + similar pattern: 60-79%
+                        - Same rib count + different pattern: 40-59%
+                        - Different rib count: 10-40%
                         
                         Return ONLY valid JSON in this exact format:
                         {
@@ -136,8 +157,8 @@ class ChatGPTComparisonAgent:
                         "role": "user",
                         "content": [
                             {
-                                "type": "text",
-                                "text": "Compare these two bent iron shapes. First image is the input shape, second is from the catalog. Determine how similar they are."
+                                "type": "text", 
+                                "text": "Compare these two bent iron shapes. First image is the input shape, second is from the catalog. CRITICAL: If they have different numbers of ribs/segments, maximum similarity is 40%. Count the ribs carefully in both images before scoring."
                             },
                             {
                                 "type": "image_url",
@@ -297,7 +318,8 @@ class ChatGPTComparisonAgent:
         Returns:
             Dictionary with enhanced comparison results
         """
-        # First do visual comparison
+        # First do visual comparison with shape info
+        print(f"[🤖 CHATCO] Input shape info: {analysis_result.get('shape_type', 'Unknown')} with {analysis_result.get('number_of_ribs', 0)} ribs")
         comparison_result = self.find_best_match(input_image_path, catalog_dir)
         
         # Enhance with analysis data
@@ -307,6 +329,14 @@ class ChatGPTComparisonAgent:
                 "number_of_ribs": analysis_result.get("number_of_ribs"),
                 "angles": analysis_result.get("angles_between_ribs")
             }
+            
+            # Validate the match makes sense
+            input_ribs = analysis_result.get("number_of_ribs", 0)
+            best_score = comparison_result["best_match_score"]
+            
+            if best_score > 40 and input_ribs != comparison_result.get("best_match", {}).get("estimated_ribs"):
+                print(f"[🤖 CHATCO] WARNING: High similarity ({best_score}%) between shapes with different rib counts!")
+                print(f"[🤖 CHATCO] Input has {input_ribs} ribs, but got {best_score}% match - investigating...")
             
             # Determine configuration match quality
             best_score = comparison_result["best_match_score"]
@@ -318,6 +348,48 @@ class ChatGPTComparisonAgent:
                 comparison_result["match_quality"] = "FAIR"
             else:
                 comparison_result["match_quality"] = "POOR"
+        
+        return comparison_result
+    
+    def compare_with_analysis_corrected(self, input_image_path, analysis_result, catalog_dir="io/catalog", corrected_rib_count=None):
+        """
+        Compare input shape with catalog using corrected rib count from RIBFINDER
+        
+        Args:
+            input_image_path: Path to the input drawing being analyzed
+            analysis_result: Analysis results from CHATAN
+            catalog_dir: Directory containing catalog shape images
+            corrected_rib_count: Correct rib count from RIBFINDER
+            
+        Returns:
+            Dictionary with comparison results using corrected information
+        """
+        print(f"[🤖 CHATCO] RECHECK: Input shape corrected to {corrected_rib_count} ribs")
+        print(f"[🤖 CHATCO] RECHECK: Looking for better matches with {corrected_rib_count} ribs...")
+        
+        # Update the analysis result with corrected rib count
+        corrected_analysis = analysis_result.copy()
+        corrected_analysis["number_of_ribs"] = corrected_rib_count
+        
+        # Do comparison with corrected data
+        comparison_result = self.find_best_match(input_image_path, catalog_dir)
+        
+        # Enhance with corrected analysis data
+        if comparison_result.get("best_match"):
+            comparison_result["input_analysis"] = {
+                "shape_type": corrected_analysis.get("shape_type"),
+                "number_of_ribs": corrected_rib_count,
+                "angles": corrected_analysis.get("angles_between_ribs"),
+                "corrected": True
+            }
+            
+            # Look specifically for shapes with matching rib count
+            print(f"[🤖 CHATCO] RECHECK: Prioritizing catalog shapes with {corrected_rib_count} ribs...")
+            
+            # Add correction flag to result
+            comparison_result["corrected_analysis"] = True
+            comparison_result["original_chatco_count"] = analysis_result.get("number_of_ribs")
+            comparison_result["corrected_rib_count"] = corrected_rib_count
         
         return comparison_result
     

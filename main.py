@@ -1,7 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
-from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent
+from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent, create_rib_finder_agent
 
 # Set UTF-8 encoding for Windows
 if sys.platform == "win32":
@@ -11,13 +11,14 @@ if sys.platform == "win32":
 # Load environment variables
 load_dotenv()
 
-def process_drawing(file_path, chat_analyse, chat_compare):
+def process_drawing(file_path, ribfinder, chat_analyse, chat_compare):
     """
-    Process a bent iron drawing using ChatGPT Vision and compare with catalog
+    Process a bent iron drawing using RibFinder, CHATAN, and CHATCO
     
     Args:
         file_path: Path to the drawing file
-        chat_analyse: ChatGPT vision agent instance (CHATAN)
+        ribfinder: RibFinder agent instance (RIBFINDER)
+        chat_analyse: ChatGPT vision agent instance (CHATAN) 
         chat_compare: ChatGPT comparison agent instance (CHATCO)
     
     Returns:
@@ -35,22 +36,45 @@ def process_drawing(file_path, chat_analyse, chat_compare):
         return {"error": f"File not found: {file_path}"}
     print(f"[🦾 IRONMAN]   ✓ File found at: {file_path}")
     
-    # Step 2: Prepare for analysis
-    print("\n[🦾 IRONMAN] [STEP 2] Preparing analysis request...")
+    # Step 2: Count ribs with RibFinder
+    print("\n[🦾 IRONMAN] [STEP 2] Counting ribs with RIBFINDER...")
+    print("[🦾 IRONMAN]   → Sending to RIBFINDER (Premium Agent)")
+    print("[🦾 IRONMAN]   → Using GPT-4o for maximum rib counting accuracy...")
+    
+    rib_result = ribfinder.count_ribs(file_path)
+    
+    if "error" in rib_result:
+        print(f"[🦾 IRONMAN]   ❌ RIBFINDER Error: {rib_result['error']}")
+        return rib_result
+    
+    rib_count = rib_result.get("rib_count", 0)
+    shape_pattern = rib_result.get("shape_pattern", "unknown")
+    confidence = rib_result.get("confidence", 0)
+    
+    print(f"[🦾 IRONMAN]   ✓ RIBFINDER found: {rib_count} ribs")
+    print(f"[🦾 IRONMAN]   → Pattern: {shape_pattern}")
+    print(f"[🦾 IRONMAN]   → Confidence: {confidence}%")
+    
+    # Step 3: Prepare for detailed analysis  
+    print("\n[🦾 IRONMAN] [STEP 3] Preparing detailed analysis request...")
     print(f"[🦾 IRONMAN]   ✓ File size: {os.path.getsize(file_path) / 1024:.2f} KB")
-    print("[🦾 IRONMAN]   ✓ Request prepared")
+    print(f"[🦾 IRONMAN]   ✓ Rib count established: {rib_count} ribs")
     
-    # Step 3: Send to CHATAN (Chat Analyse Agent)
-    print("\n[🦾 IRONMAN] [STEP 3] Sending request to CHATAN (Analysis Agent)...")
-    print("[🦾 IRONMAN]   → Transferring image to CHATAN")
-    print("[🦾 IRONMAN]   → Waiting for CHATAN's vision analysis...")
+    # Step 4: Send to CHATAN (Chat Analyse Agent) with rib count info
+    print("\n[🦾 IRONMAN] [STEP 4] Sending request to CHATAN (Analysis Agent)...")
+    print(f"[🦾 IRONMAN]   → Transferring image to CHATAN with established rib count: {rib_count}")
+    print(f"[🦾 IRONMAN]   → CHATAN will use RIBFINDER's accurate count ({rib_count} ribs)")
     
-    result = chat_analyse.analyze_drawing(file_path)
+    result = chat_analyse.analyze_with_rib_count(file_path, rib_result)
     
     print("[🦾 IRONMAN]   ✓ Response received from CHATAN")
     
-    # Step 4: Process and display results
-    print("\n[🦾 IRONMAN] [STEP 4] Processing analysis results...")
+    # Add RibFinder results to the main result
+    result["ribfinder"] = rib_result
+    result["expected_rib_count"] = rib_count
+    
+    # Step 5: Process and display results
+    print("\n[🦾 IRONMAN] [STEP 5] Processing analysis results...")
     print("-"*60)
     print("[🦾 IRONMAN] ANALYSIS RESULTS:")
     print("-"*60)
@@ -147,17 +171,64 @@ def process_drawing(file_path, chat_analyse, chat_compare):
         
         print("-"*60)
     
-    # Step 5: Compare with catalog shapes using CHATCO
-    print("\n[🦾 IRONMAN] [STEP 5] Comparing with catalog shapes...")
+    # Step 6: Compare with catalog shapes using CHATCO
+    print("\n[🦾 IRONMAN] [STEP 6] Comparing with catalog shapes...")
     print("[🦾 IRONMAN]   → Sending to CHATCO (Comparison Agent)")
     print("[🦾 IRONMAN]   → CHATCO analyzing similarity with catalog...")
     
-    comparison_result = chat_compare.find_best_match(file_path, "io/catalog")
+    comparison_result = chat_compare.compare_with_analysis(file_path, result, "io/catalog")
+    
+    # Check for rib count inconsistencies between agents
+    ribfinder_count = rib_result.get("rib_count", 0)
+    chatan_count = result.get("number_of_ribs", 0)
+    
+    # Extract CHATCO's detected rib count from differences
+    chatco_detected_count = None
+    if comparison_result.get("best_match") and comparison_result["best_match"].get("differences"):
+        differences = comparison_result["best_match"]["differences"]
+        for diff in differences:
+            import re
+            # Look for various patterns of rib count mentions
+            patterns = [
+                r'Input shape has (\d+) ribs',
+                r'Different rib counts: (\d+) ribs vs',
+                r'(\d+) ribs vs \d+ rib'
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, diff)
+                if match:
+                    chatco_detected_count = int(match.group(1))
+                    break
+            if chatco_detected_count:
+                break
+    
+    # Detect inconsistency
+    inconsistency_detected = False
+    if chatco_detected_count and chatco_detected_count != ribfinder_count:
+        inconsistency_detected = True
+        print(f"\n[🦾 IRONMAN] ⚠️ RIB COUNT INCONSISTENCY DETECTED!")
+        print(f"[🦾 IRONMAN]   → RIBFINDER found: {ribfinder_count} ribs")
+        print(f"[🦾 IRONMAN]   → CHATAN confirmed: {chatan_count} ribs")
+        print(f"[🦾 IRONMAN]   → CHATCO detected: {chatco_detected_count} ribs")
+        print(f"[🦾 IRONMAN]   → Asking CHATCO to recheck with correct rib count...")
+        
+        # Ask CHATCO to reanalyze with the correct rib count
+        print(f"[🦾 IRONMAN] [STEP 6.1] CHATCO recheck with established {ribfinder_count} ribs...")
+        comparison_result = chat_compare.compare_with_analysis_corrected(file_path, result, "io/catalog", ribfinder_count)
     
     if comparison_result.get("best_match"):
         best_match = comparison_result["best_match"]
         print(f"[🦾 IRONMAN]   ✓ Best match found: {best_match['catalog_file']}")
         print(f"[🦾 IRONMAN]   → Similarity: {best_match.get('similarity_score', 0)}%")
+        
+        # Show CHATCO's detailed analysis
+        if best_match.get('matching_features'):
+            print(f"[🦾 IRONMAN]   → CHATCO found matching features: {', '.join(best_match['matching_features'])}")
+        if best_match.get('differences'):
+            print(f"[🦾 IRONMAN]   → CHATCO found differences: {', '.join(best_match['differences'])}")
+        if best_match.get('reasoning'):
+            print(f"[🦾 IRONMAN]   → CHATCO reasoning: {best_match['reasoning']}")
         
         # Determine match quality based on score
         score = best_match.get('similarity_score', 0)
@@ -177,7 +248,10 @@ def process_drawing(file_path, chat_analyse, chat_compare):
             "best_match_file": best_match['catalog_file'],
             "similarity_score": best_match.get('similarity_score', 0),
             "shape_match": best_match.get('shape_match', False),
-            "match_quality": match_quality
+            "match_quality": match_quality,
+            "matching_features": best_match.get('matching_features', []),
+            "differences": best_match.get('differences', []),
+            "reasoning": best_match.get('reasoning', '')
         }
     else:
         print("[🦾 IRONMAN]   ⚠️ No matching catalog shape found")
@@ -235,7 +309,7 @@ def validate_results_with_user(result, file_name):
             print("  ✓ Results auto-accepted (non-interactive mode)")
             return True
 
-def reprocess_drawing(file_path, chat_analyse, chat_compare, previous_result, attempt_number):
+def reprocess_drawing(file_path, ribfinder, chat_analyse, chat_compare, previous_result, attempt_number):
     """
     Reprocess a drawing with additional instructions for CHATAN to recheck
     
@@ -320,6 +394,10 @@ def main():
     
     # Initialize ChatGPT Agents with their nicknames
     print("\n[🦾 IRONMAN] Creating sub-agents...")
+    print("[🦾 IRONMAN]   → Initializing RIBFINDER (Premium Rib Counter)...")
+    ribfinder = create_rib_finder_agent(api_key)  # RIBFINDER
+    print("[🦾 IRONMAN]   ✓ RIBFINDER (GPT-4o Rib Counter) created and ready")
+    
     print("[🦾 IRONMAN]   → Initializing CHATAN (Chat Analyse Agent)...")
     chat_analyse = create_chatgpt_vision_agent(api_key)  # CHATAN
     print("[🦾 IRONMAN]   ✓ CHATAN (Analysis Agent) created and ready")
@@ -361,10 +439,10 @@ def main():
     all_results = []
     for i, file in enumerate(files, 1):
         file_path = os.path.join(input_dir, file)
-        print(f"\n[🦾 IRONMAN] Dispatching file {i}/{len(files)} to CHATAN & CHATCO...")
+        print(f"\n[🦾 IRONMAN] Dispatching file {i}/{len(files)} to RIBFINDER, CHATAN & CHATCO...")
         
-        # Initial analysis
-        result = process_drawing(file_path, chat_analyse, chat_compare)
+        # Initial analysis with RibFinder first
+        result = process_drawing(file_path, ribfinder, chat_analyse, chat_compare)
         
         # Validate results with user
         print(f"\n[🦾 IRONMAN] Requesting user validation for file {i}/{len(files)}")
@@ -388,7 +466,7 @@ def main():
                     print("[🦾 IRONMAN]   → Asking CHATAN to recheck analysis...")
                     
                     # Add instruction for recheck
-                    result = reprocess_drawing(file_path, chat_analyse, chat_compare, result, retry_count)
+                    result = reprocess_drawing(file_path, ribfinder, chat_analyse, chat_compare, result, retry_count)
                 else:
                     print(f"\n[🦾 IRONMAN] Maximum retries reached for {file}")
                     result["status"] = "Max retries reached - user rejected"
@@ -424,6 +502,58 @@ def main():
                 print(f"[🦾 IRONMAN]   • {file_name}: {shape} (Confidence: {confidence}%) → Catalog: {comp['best_match_file']} ({comp['similarity_score']}%)")
             else:
                 print(f"[🦾 IRONMAN]   • {file_name}: {shape} (Confidence: {confidence}%) → No catalog match")
+    
+    # Detailed breakdown per agent
+    print("\n" + "="*60)
+    print("🦾 IRONMAN DETAILED AGENT BREAKDOWN")
+    print("="*60)
+    
+    for item in all_results:
+        file_name = item["file"]
+        result = item["result"]
+        if "error" not in result:
+            print(f"\n[🦾 IRONMAN] FILE: {file_name}")
+            print("-" * 50)
+            
+            # RibFinder results
+            ribfinder_data = result.get('ribfinder', {})
+            ribfinder_count = ribfinder_data.get('rib_count', 0)
+            print(f"RIBFINDER: number of ribs is - {ribfinder_count}")
+            
+            # CHATAN results
+            chatan_count = result.get('number_of_ribs', 0)
+            print(f"CHATAN: number of ribs - {chatan_count}")
+            
+            sides = result.get('sides', [])
+            if sides:
+                for side in sides:
+                    side_num = side.get('side_number', '?')
+                    description = side.get('description', 'unknown')
+                    length = side.get('length', 0)
+                    print(f"         rib {side_num}: {description}, {length} mm")
+            else:
+                print("         no rib details available")
+            
+            # CHATCO results
+            comp = result.get('comparison', {})
+            if comp.get('best_match_file'):
+                catalog_shape = comp.get('best_match_file', 'unknown')
+                similarity = comp.get('similarity_score', 0)
+                print(f"CHATCO: shape {catalog_shape} (similarity: {similarity}%)")
+                
+                # Show CHATCO's detailed analysis
+                matching = comp.get('matching_features', [])
+                differences = comp.get('differences', [])
+                reasoning = comp.get('reasoning', '')
+                
+                if matching:
+                    print(f"         matching features: {', '.join(matching)}")
+                if differences:
+                    print(f"         differences: {', '.join(differences)}")
+                if reasoning:
+                    print(f"         reasoning: {reasoning}")
+            else:
+                print("CHATCO: no matching shape found")
     
     print("\n[🦾 IRONMAN] System workflow completed successfully")
     print("="*60)
