@@ -1,7 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
-from agents.llm_agents import create_chatgpt_vision_agent
+from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent
 
 # Set UTF-8 encoding for Windows
 if sys.platform == "win32":
@@ -11,16 +11,17 @@ if sys.platform == "win32":
 # Load environment variables
 load_dotenv()
 
-def process_drawing(file_path, chatgpt_agent):
+def process_drawing(file_path, chat_analyse, chat_compare):
     """
-    Process a bent iron drawing using ChatGPT Vision
+    Process a bent iron drawing using ChatGPT Vision and compare with catalog
     
     Args:
         file_path: Path to the drawing file
-        chatgpt_agent: ChatGPT vision agent instance
+        chat_analyse: ChatGPT vision agent instance (CHATAN)
+        chat_compare: ChatGPT comparison agent instance (CHATCO)
     
     Returns:
-        Dictionary with analysis results
+        Dictionary with analysis results and comparison
     """
     
     print("\n" + "="*60)
@@ -39,14 +40,14 @@ def process_drawing(file_path, chatgpt_agent):
     print(f"[🦾 IRONMAN]   ✓ File size: {os.path.getsize(file_path) / 1024:.2f} KB")
     print("[🦾 IRONMAN]   ✓ Request prepared")
     
-    # Step 3: Send to ChatGPT Vision Agent
-    print("\n[🦾 IRONMAN] [STEP 3] Sending request to ChatGPT Vision Agent...")
-    print("[🦾 IRONMAN]   → Transferring image to sub-agent")
-    print("[🦾 IRONMAN]   → Waiting for vision analysis...")
+    # Step 3: Send to CHATAN (Chat Analyse Agent)
+    print("\n[🦾 IRONMAN] [STEP 3] Sending request to CHATAN (Analysis Agent)...")
+    print("[🦾 IRONMAN]   → Transferring image to CHATAN")
+    print("[🦾 IRONMAN]   → Waiting for CHATAN's vision analysis...")
     
-    result = chatgpt_agent.analyze_drawing(file_path)
+    result = chat_analyse.analyze_drawing(file_path)
     
-    print("[🦾 IRONMAN]   ✓ Response received from ChatGPT Vision Agent")
+    print("[🦾 IRONMAN]   ✓ Response received from CHATAN")
     
     # Step 4: Process and display results
     print("\n[🦾 IRONMAN] [STEP 4] Processing analysis results...")
@@ -89,6 +90,106 @@ def process_drawing(file_path, chatgpt_agent):
     
     print("-"*60)
     
+    # Check for missing dimensions
+    missing_dimensions = False
+    if "sides" in result:
+        for side in result["sides"]:
+            if side.get("length", 0) == 0:
+                missing_dimensions = True
+                missing_side = side.get("side_number", "?")
+                missing_desc = side.get("description", "unknown")
+                print(f"\n[🦾 IRONMAN] ⚠️ WARNING: Missing dimension detected!")
+                print(f"[🦾 IRONMAN]   → Rib {missing_side} ({missing_desc}) has 0 mm")
+                break
+    
+    # If dimensions are missing, ask CHATAN to reanalyze
+    if missing_dimensions:
+        print(f"\n[🦾 IRONMAN] [STEP 3.1] Requesting CHATAN to search for missing dimensions...")
+        print(f"[🦾 IRONMAN]   → CHATAN, please look more carefully for ALL dimensions")
+        print(f"[🦾 IRONMAN]   → Focus on finding the {missing_desc} dimension")
+        
+        # Reanalyze with CHATAN focusing on missing dimensions
+        result = chat_analyse.recheck_analysis(file_path, result)
+        
+        print(f"[🦾 IRONMAN]   ✓ CHATAN completed dimension search")
+        
+        # Display updated results
+        print("\n" + "-"*60)
+        print("[🦾 IRONMAN] UPDATED ANALYSIS RESULTS:")
+        print("-"*60)
+        print(f"[🦾 IRONMAN] Shape Type:        {result.get('shape_type', 'Unknown')}")
+        print(f"[🦾 IRONMAN] Number of Ribs:    {result.get('number_of_ribs', 0)}")
+        print(f"[🦾 IRONMAN] Confidence Score:  {result.get('confidence', 0)}%")
+        
+        angles = result.get('angles_between_ribs', [])
+        if angles:
+            print(f"[🦾 IRONMAN] Angles between Ribs: {angles}°")
+        
+        sides = result.get('sides', [])
+        if sides:
+            print("\n[🦾 IRONMAN] Updated Ribs Details:")
+            for side in sides:
+                side_num = side.get('side_number', '?')
+                length = side.get('length', 0)
+                angle = side.get('angle_to_next', 0)
+                description = side.get('description', '')
+                
+                # Highlight if dimension was found
+                status = "✅" if length > 0 else "❌ STILL MISSING"
+                rib_info = f"[🦾 IRONMAN]   Rib {side_num}: {length} mm"
+                if description:
+                    rib_info += f" ({description})"
+                rib_info += f" {status}"
+                print(rib_info)
+                
+                if angle > 0:
+                    print(f"[🦾 IRONMAN]     → Angle to next rib: {angle}°")
+        
+        print("-"*60)
+    
+    # Step 5: Compare with catalog shapes using CHATCO
+    print("\n[🦾 IRONMAN] [STEP 5] Comparing with catalog shapes...")
+    print("[🦾 IRONMAN]   → Sending to CHATCO (Comparison Agent)")
+    print("[🦾 IRONMAN]   → CHATCO analyzing similarity with catalog...")
+    
+    comparison_result = chat_compare.find_best_match(file_path, "io/catalog")
+    
+    if comparison_result.get("best_match"):
+        best_match = comparison_result["best_match"]
+        print(f"[🦾 IRONMAN]   ✓ Best match found: {best_match['catalog_file']}")
+        print(f"[🦾 IRONMAN]   → Similarity: {best_match.get('similarity_score', 0)}%")
+        
+        # Determine match quality based on score
+        score = best_match.get('similarity_score', 0)
+        if score >= 90:
+            match_quality = "EXCELLENT"
+        elif score >= 70:
+            match_quality = "GOOD"
+        elif score >= 50:
+            match_quality = "FAIR"
+        else:
+            match_quality = "POOR"
+        
+        print(f"[🦾 IRONMAN]   → Match Quality: {match_quality}")
+        
+        # Add comparison results to main result
+        result["comparison"] = {
+            "best_match_file": best_match['catalog_file'],
+            "similarity_score": best_match.get('similarity_score', 0),
+            "shape_match": best_match.get('shape_match', False),
+            "match_quality": match_quality
+        }
+    else:
+        print("[🦾 IRONMAN]   ⚠️ No matching catalog shape found")
+        result["comparison"] = {
+            "best_match_file": None,
+            "similarity_score": 0,
+            "shape_match": False,
+            "match_quality": "NO_MATCH"
+        }
+    
+    print("-"*60)
+    
     return result
 
 def validate_results_with_user(result, file_name):
@@ -110,6 +211,14 @@ def validate_results_with_user(result, file_name):
     print(f"Ribs: {result.get('number_of_ribs', 0)}")
     print(f"Confidence: {result.get('confidence', 0)}%")
     
+    # Show comparison results if available
+    if result.get('comparison'):
+        comp = result['comparison']
+        if comp.get('best_match_file'):
+            print(f"Best Catalog Match: {comp['best_match_file']}")
+            print(f"Match Similarity: {comp['similarity_score']}%")
+            print(f"Match Quality: {comp['match_quality']}")
+    
     while True:
         try:
             user_input = input("\nAre these results correct? (y/n): ").lower().strip()
@@ -126,27 +235,28 @@ def validate_results_with_user(result, file_name):
             print("  ✓ Results auto-accepted (non-interactive mode)")
             return True
 
-def reprocess_drawing(file_path, chatgpt_agent, previous_result, attempt_number):
+def reprocess_drawing(file_path, chat_analyse, chat_compare, previous_result, attempt_number):
     """
-    Reprocess a drawing with additional instructions for ChatGPT to recheck
+    Reprocess a drawing with additional instructions for CHATAN to recheck
     
     Args:
         file_path: Path to the drawing file
-        chatgpt_agent: ChatGPT vision agent instance
+        chat_analyse: ChatGPT vision agent instance (CHATAN)
+        chat_compare: ChatGPT comparison agent instance (CHATCO)
         previous_result: Previous analysis results that were rejected
         attempt_number: Current attempt number
         
     Returns:
         Dictionary with new analysis results
     """
-    print(f"\n[🦾 IRONMAN] [STEP 3.{attempt_number}] Re-sending request to ChatGPT Vision Agent...")
-    print("[🦾 IRONMAN]   → Asking agent to double-check previous analysis")
-    print("[🦾 IRONMAN]   → Requesting more careful examination of the drawing")
+    print(f"\n[🦾 IRONMAN] [STEP 3.{attempt_number}] Re-sending request to CHATAN...")
+    print("[🦾 IRONMAN]   → Asking CHATAN to double-check previous analysis")
+    print("[🦾 IRONMAN]   → Requesting more careful examination from CHATAN")
     
     # Create a special recheck method
-    result = chatgpt_agent.recheck_analysis(file_path, previous_result)
+    result = chat_analyse.recheck_analysis(file_path, previous_result)
     
-    print("[🦾 IRONMAN]   ✓ Recheck analysis received from ChatGPT Vision Agent")
+    print("[🦾 IRONMAN]   ✓ Recheck analysis received from CHATAN")
     
     # Print the new results
     print("\n" + "-"*60)
@@ -208,11 +318,15 @@ def main():
         return
     print("[🦾 IRONMAN]   ✓ API key loaded successfully")
     
-    # Initialize ChatGPT Vision Agent
+    # Initialize ChatGPT Agents with their nicknames
     print("\n[🦾 IRONMAN] Creating sub-agents...")
-    print("[🦾 IRONMAN]   → Initializing ChatGPT Vision Agent...")
-    chatgpt_agent = create_chatgpt_vision_agent(api_key)
-    print("[🦾 IRONMAN]   ✓ ChatGPT Vision Agent created and ready")
+    print("[🦾 IRONMAN]   → Initializing CHATAN (Chat Analyse Agent)...")
+    chat_analyse = create_chatgpt_vision_agent(api_key)  # CHATAN
+    print("[🦾 IRONMAN]   ✓ CHATAN (Analysis Agent) created and ready")
+    
+    print("[🦾 IRONMAN]   → Initializing CHATCO (Chat Compare Agent)...")
+    chat_compare = create_chatgpt_comparison_agent(api_key)  # CHATCO
+    print("[🦾 IRONMAN]   ✓ CHATCO (Comparison Agent) created and ready")
     
     # Check for input files
     print("\n[🦾 IRONMAN] Scanning input directory...")
@@ -247,10 +361,10 @@ def main():
     all_results = []
     for i, file in enumerate(files, 1):
         file_path = os.path.join(input_dir, file)
-        print(f"\n[🦾 IRONMAN] Dispatching file {i}/{len(files)} to sub-agent...")
+        print(f"\n[🦾 IRONMAN] Dispatching file {i}/{len(files)} to CHATAN & CHATCO...")
         
         # Initial analysis
-        result = process_drawing(file_path, chatgpt_agent)
+        result = process_drawing(file_path, chat_analyse, chat_compare)
         
         # Validate results with user
         print(f"\n[🦾 IRONMAN] Requesting user validation for file {i}/{len(files)}")
@@ -271,10 +385,10 @@ def main():
                 retry_count += 1
                 if retry_count < max_retries:
                     print(f"\n[🦾 IRONMAN] Reprocessing attempt {retry_count}/{max_retries-1}")
-                    print("[🦾 IRONMAN]   → Asking ChatGPT agent to recheck analysis...")
+                    print("[🦾 IRONMAN]   → Asking CHATAN to recheck analysis...")
                     
                     # Add instruction for recheck
-                    result = reprocess_drawing(file_path, chatgpt_agent, result, retry_count)
+                    result = reprocess_drawing(file_path, chat_analyse, chat_compare, result, retry_count)
                 else:
                     print(f"\n[🦾 IRONMAN] Maximum retries reached for {file}")
                     result["status"] = "Max retries reached - user rejected"
@@ -305,7 +419,11 @@ def main():
         else:
             shape = result.get('shape_type', 'Unknown')
             confidence = result.get('confidence', 0)
-            print(f"[🦾 IRONMAN]   • {file_name}: {shape} (Confidence: {confidence}%)")
+            comp = result.get('comparison', {})
+            if comp.get('best_match_file'):
+                print(f"[🦾 IRONMAN]   • {file_name}: {shape} (Confidence: {confidence}%) → Catalog: {comp['best_match_file']} ({comp['similarity_score']}%)")
+            else:
+                print(f"[🦾 IRONMAN]   • {file_name}: {shape} (Confidence: {confidence}%) → No catalog match")
     
     print("\n[🦾 IRONMAN] System workflow completed successfully")
     print("="*60)

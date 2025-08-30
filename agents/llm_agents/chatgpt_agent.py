@@ -38,9 +38,9 @@ class ChatGPTVisionAgent:
             "timeout": 120,
         }
         
-        # Create the vision analysis agent
+        # Create the vision analysis agent (CHATAN)
         self.agent = autogen.AssistantAgent(
-            name="ChatGPT_Vision_Analyzer",
+            name="CHATAN_Analyser",
             llm_config=llm_config,
             system_message="""You are a specialized agent for analyzing bent iron order drawings.
             
@@ -101,8 +101,8 @@ class ChatGPTVisionAgent:
             # Prepare the image for analysis
             base64_image = self.encode_image(image_path)
             
-            print(f"Analyzing image: {image_path}")
-            print("Sending to ChatGPT Vision API...")
+            print(f"[CHATAN] Analyzing image: {os.path.basename(image_path)}")
+            print("[CHATAN] Sending to Vision API...")
             
             # Call GPT-4 Vision API
             response = self.client.chat.completions.create(
@@ -177,7 +177,7 @@ class ChatGPTVisionAgent:
             
             # Parse the response
             result_text = response.choices[0].message.content
-            print(f"API Response: {result_text}")
+            print(f"[CHATAN] Analysis complete")
             
             # Try to parse JSON from response
             try:
@@ -225,8 +225,8 @@ class ChatGPTVisionAgent:
             # Prepare the image for analysis
             base64_image = self.encode_image(image_path)
             
-            print(f"Rechecking image: {image_path}")
-            print("Sending recheck request to ChatGPT Vision API...")
+            print(f"[CHATAN] Rechecking image: {os.path.basename(image_path)}")
+            print("[CHATAN] Sending recheck request to Vision API...")
             
             # Call GPT-4 Vision API with recheck instructions
             response = self.client.chat.completions.create(
@@ -301,7 +301,7 @@ class ChatGPTVisionAgent:
             
             # Parse the response
             result_text = response.choices[0].message.content
-            print(f"Recheck API Response: {result_text}")
+            print(f"[CHATAN] Recheck analysis complete")
             
             # Try to parse JSON from response
             try:
