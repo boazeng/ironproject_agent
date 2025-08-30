@@ -79,7 +79,7 @@ class ChatGPTComparisonAgent:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     
-    def compare_single_shape(self, input_image_path: str, catalog_image_path: str) -> Dict:
+    def compare_single_shape(self, input_image_path: str, catalog_image_path: str, input_rib_count: int = None) -> Dict:
         """
         Compare input shape with a single catalog shape
         
@@ -158,20 +158,20 @@ class ChatGPTComparisonAgent:
                         "content": [
                             {
                                 "type": "text", 
-                                "text": "Compare these two bent iron shapes. First image is the input shape, second is from the catalog. CRITICAL: If they have different numbers of ribs/segments, maximum similarity is 40%. Count the ribs carefully in both images before scoring."
+                                "text": f"Compare these two bent iron shapes. First image is the input shape{f' which has {input_rib_count} ribs' if input_rib_count else ''}, second is from the catalog. CRITICAL: If they have different numbers of ribs/segments, maximum similarity is 40%. Count the ribs carefully in both images. An L-shape has 2 ribs (one vertical, one horizontal), a U-shape has 3 ribs. In catalog images, letters like 'A' and 'C' often label the ribs - if you see A marking a vertical segment and C marking a horizontal segment, that's an L-shape with 2 ribs. Focus on the actual iron segments, not just visible lines."
                             },
                             {
                                 "type": "image_url",
                                 "image_url": {
                                     "url": f"data:image/jpeg;base64,{input_base64}",
-                                    "detail": "low"
+                                    "detail": "high"  # Use high detail for accurate rib counting
                                 }
                             },
                             {
                                 "type": "image_url",
                                 "image_url": {
                                     "url": f"data:image/jpeg;base64,{catalog_base64}",
-                                    "detail": "low"
+                                    "detail": "high"  # Use high detail for accurate rib counting
                                 }
                             }
                         ]
@@ -214,7 +214,7 @@ class ChatGPTComparisonAgent:
                 "catalog_file": os.path.basename(catalog_image_path)
             }
     
-    def find_best_match(self, input_image_path: str, catalog_dir: str = "io/catalog") -> Dict:
+    def find_best_match(self, input_image_path: str, catalog_dir: str = "io/catalog", input_rib_count: int = None) -> Dict:
         """
         Compare input shape with all catalog shapes and find the best match
         
@@ -259,7 +259,7 @@ class ChatGPTComparisonAgent:
             
             for catalog_file in catalog_files:
                 catalog_path = os.path.join(catalog_dir, catalog_file)
-                comparison_result = self.compare_single_shape(input_image_path, catalog_path)
+                comparison_result = self.compare_single_shape(input_image_path, catalog_path, input_rib_count)
                 
                 if "error" not in comparison_result:
                     all_comparisons.append(comparison_result)
@@ -270,11 +270,15 @@ class ChatGPTComparisonAgent:
                         highest_score = score
                         best_match = comparison_result
                         
-                    # Print progress
+                    # Print progress with more detail
                     if score >= 70:
                         print(f"  [CHATCO]  ✓ Good match: {catalog_file} ({score}%)")
                     else:
                         print(f"  [CHATCO]  - Low match: {catalog_file} ({score}%)")
+                    
+                    # Debug: Show what CHATCO detected for shape 104
+                    if "104" in catalog_file and comparison_result.get("differences"):
+                        print(f"  [CHATCO] DEBUG - Shape 104 analysis: {comparison_result.get('differences')}")
             
             # Prepare final result
             result = {
@@ -319,8 +323,9 @@ class ChatGPTComparisonAgent:
             Dictionary with enhanced comparison results
         """
         # First do visual comparison with shape info
-        print(f"[🤖 CHATCO] Input shape info: {analysis_result.get('shape_type', 'Unknown')} with {analysis_result.get('number_of_ribs', 0)} ribs")
-        comparison_result = self.find_best_match(input_image_path, catalog_dir)
+        input_rib_count = analysis_result.get('number_of_ribs', 0)
+        print(f"[🤖 CHATCO] Input shape info: {analysis_result.get('shape_type', 'Unknown')} with {input_rib_count} ribs")
+        comparison_result = self.find_best_match(input_image_path, catalog_dir, input_rib_count)
         
         # Enhance with analysis data
         if comparison_result.get("best_match"):
@@ -372,7 +377,7 @@ class ChatGPTComparisonAgent:
         corrected_analysis["number_of_ribs"] = corrected_rib_count
         
         # Do comparison with corrected data
-        comparison_result = self.find_best_match(input_image_path, catalog_dir)
+        comparison_result = self.find_best_match(input_image_path, catalog_dir, corrected_rib_count)
         
         # Enhance with corrected analysis data
         if comparison_result.get("best_match"):

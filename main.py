@@ -50,10 +50,13 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare):
     rib_count = rib_result.get("rib_count", 0)
     shape_pattern = rib_result.get("shape_pattern", "unknown")
     confidence = rib_result.get("confidence", 0)
+    match_percentage = rib_result.get("match_percentage", 0)
+    vision_agreement = rib_result.get("vision_agreement", "UNKNOWN")
     
     print(f"[🦾 IRONMAN]   ✓ RIBFINDER found: {rib_count} ribs")
     print(f"[🦾 IRONMAN]   → Pattern: {shape_pattern}")
     print(f"[🦾 IRONMAN]   → Confidence: {confidence}%")
+    print(f"[🦾 IRONMAN]   → Vision Match: {match_percentage}% ({vision_agreement})")
     
     # Step 3: Prepare for detailed analysis  
     print("\n[🦾 IRONMAN] [STEP 3] Preparing detailed analysis request...")
@@ -518,7 +521,10 @@ def main():
             # RibFinder results
             ribfinder_data = result.get('ribfinder', {})
             ribfinder_count = ribfinder_data.get('rib_count', 0)
+            match_percentage = ribfinder_data.get('match_percentage', 0)
+            vision_agreement = ribfinder_data.get('vision_agreement', 'UNKNOWN')
             print(f"RIBFINDER: number of ribs is - {ribfinder_count}")
+            print(f"         match percentage - {match_percentage}% ({vision_agreement})")
             
             # CHATAN results
             chatan_count = result.get('number_of_ribs', 0)

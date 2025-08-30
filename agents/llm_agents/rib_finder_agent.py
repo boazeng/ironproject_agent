@@ -4,22 +4,40 @@ import json
 import autogen
 from openai import OpenAI
 from typing import Dict
+import requests
+from google.cloud import vision
+import io
 
 class RibFinderAgent:
     """
     Specialized agent that uses high-end ChatGPT to accurately count ribs in bent iron drawings
     """
     
-    def __init__(self, api_key):
+    def __init__(self, api_key, google_vision_api_key=None):
         """
-        Initialize the RibFinder agent with premium model
+        Initialize the RibFinder agent with premium model and Google Vision
         
         Args:
             api_key: OpenAI API key
+            google_vision_api_key: Google Vision API key (optional)
         """
         # Initialize OpenAI client
         self.client = OpenAI(api_key=api_key)
         self.api_key = api_key
+        
+        # Initialize Google Vision API
+        self.google_vision_api_key = google_vision_api_key or os.getenv("GOOGLE_VISION_API_KEY")
+        self.google_credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        
+        # Initialize Google Vision client if credentials available
+        self.vision_client = None
+        if self.google_credentials_path and os.path.exists(self.google_credentials_path):
+            self.vision_client = vision.ImageAnnotatorClient()
+            print("[RIBFINDER] Google Vision API initialized with service account")
+        elif self.google_vision_api_key:
+            print("[RIBFINDER] Google Vision API initialized with API key")
+        else:
+            print("[RIBFINDER] Google Vision API not configured - using ChatGPT only")
         
         # Configuration for highest quality GPT model
         config_list = [
@@ -70,15 +88,61 @@ class RibFinderAgent:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     
-    def count_ribs(self, image_path: str) -> Dict:
+    def analyze_with_google_vision(self, image_path: str) -> int:
         """
-        Count ribs in a bent iron drawing using premium GPT model
+        Analyze image with Google Vision API to count ribs
         
         Args:
             image_path: Path to the drawing image
             
         Returns:
-            Dictionary with rib count results
+            Number of ribs detected by Google Vision
+        """
+        try:
+            if not self.vision_client:
+                return None
+                
+            with io.open(image_path, 'rb') as image_file:
+                content = image_file.read()
+            
+            image = vision.Image(content=content)
+            
+            # Perform text detection to help identify dimensions and structure
+            response = self.vision_client.text_detection(image=image)
+            texts = response.text_annotations
+            
+            # Perform object detection
+            objects_response = self.vision_client.object_localization(image=image)
+            objects = objects_response.localized_object_annotations
+            
+            # Simple heuristic: count detected text groups as potential rib indicators
+            # This is a simplified approach - you might need more sophisticated logic
+            if texts:
+                # Count dimension indicators (numbers) as potential ribs
+                dimension_count = len([t for t in texts if any(char.isdigit() for char in t.description)])
+                # Basic heuristic: if we see 3 dimension groups, likely 3 ribs
+                if dimension_count >= 3:
+                    return 3
+                elif dimension_count == 2:
+                    return 2
+                else:
+                    return 1
+            
+            return None
+            
+        except Exception as e:
+            print(f"[RIBFINDER] Google Vision analysis failed: {e}")
+            return None
+    
+    def count_ribs(self, image_path: str) -> Dict:
+        """
+        Count ribs in a bent iron drawing using both Google Vision and ChatGPT
+        
+        Args:
+            image_path: Path to the drawing image
+            
+        Returns:
+            Dictionary with rib count results including match percentage
         """
         try:
             # Check if file exists
@@ -89,7 +153,17 @@ class RibFinderAgent:
             base64_image = self.encode_image(image_path)
             
             print(f"[RIBFINDER] Analyzing ribs in: {os.path.basename(image_path)}")
-            print("[RIBFINDER] Using GPT-4o for maximum accuracy...")
+            
+            # First, try Google Vision API if available
+            google_vision_count = None
+            if self.vision_client:
+                print("[RIBFINDER] Using Google Vision API...")
+                google_vision_count = self.analyze_with_google_vision(image_path)
+                if google_vision_count:
+                    print(f"[RIBFINDER] Google Vision detected: {google_vision_count} ribs")
+            
+            # Then use ChatGPT Vision
+            print("[RIBFINDER] Using ChatGPT Vision (GPT-4o)...")
             
             # Call premium GPT-4 Vision API
             response = self.client.chat.completions.create(
@@ -160,7 +234,6 @@ class RibFinderAgent:
             
             # Parse the response
             result_text = response.choices[0].message.content
-            print(f"[RIBFINDER] Analysis complete")
             
             # Try to parse JSON from response
             try:
@@ -204,6 +277,32 @@ class RibFinderAgent:
                         "reasoning": "Complete parsing failure",
                         "raw_response": result_text
                     }
+            
+            # Get ChatGPT rib count
+            chatgpt_count = result.get("rib_count", 0)
+            print(f"[RIBFINDER] ChatGPT detected: {chatgpt_count} ribs")
+            
+            # Calculate match percentage
+            if google_vision_count is not None:
+                if google_vision_count == chatgpt_count:
+                    match_percentage = 100
+                    print(f"[RIBFINDER] ✓ AGREEMENT: Both systems detected {chatgpt_count} ribs (100% match)")
+                else:
+                    match_percentage = 50
+                    print(f"[RIBFINDER] ⚠ DISAGREEMENT: Google Vision={google_vision_count}, ChatGPT={chatgpt_count} (50% match)")
+                    # Use ChatGPT's count as primary but note the disagreement
+                    result["google_vision_count"] = google_vision_count
+                    result["chatgpt_count"] = chatgpt_count
+            else:
+                # Only ChatGPT available
+                match_percentage = 75  # Single source confidence
+                print(f"[RIBFINDER] ChatGPT only: {chatgpt_count} ribs (75% - single source)")
+            
+            # Add match percentage to result
+            result["match_percentage"] = match_percentage
+            result["vision_agreement"] = "AGREE" if match_percentage == 100 else "DISAGREE" if match_percentage == 50 else "SINGLE_SOURCE"
+            
+            print(f"[RIBFINDER] Analysis complete - Match: {match_percentage}%")
             
             return result
             
