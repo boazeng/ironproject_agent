@@ -1,0 +1,114 @@
+{
+  "metadata": {
+    "created": "2025-08-31T22:08:58.014724",
+    "description": "Iron order drawing analysis results",
+    "total_records": 2,
+    "last_updated": "2025-08-31T22:46:04.823879"
+  },
+  "drawings": [
+    {
+      "id": "979fa4c6-3713-4012-8540-d62d2b485f8d",
+      "order_number": "ORD-20250831-001",
+      "file_name": "Screenshot 2025-08-28 at 10.32.53 AM.png",
+      "date": "2025-08-31T22:44:44.697366",
+      "number_of_ribs": 3,
+      "straight_rib": true,
+      "shape_explanation": "d. U rib with different side rib length with rotation",
+      "path_degrees": [
+        {
+          "rib_number": 1,
+          "length": 50,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 2,
+          "length": 110,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 3,
+          "length": 50,
+          "degree_to_next": null
+        }
+      ],
+      "path_vectors": [
+        {
+          "rib_number": 1,
+          "dx": 0,
+          "dy": 50
+        },
+        {
+          "rib_number": 2,
+          "dx": 110,
+          "dy": 0
+        },
+        {
+          "rib_number": 3,
+          "dx": 0,
+          "dy": -50
+        }
+      ],
+      "compatible_catalog_shape": {
+        "best_match_file": "shape 000.png",
+        "similarity_score": 40,
+        "match_quality": "POOR",
+        "is_compatible": false,
+        "differences": [
+          "Input shape has 3 ribs, catalog shape has 1 rib"
+        ]
+      }
+    },
+    {
+      "id": "ef19df1b-6392-4291-8f19-8ff2e0a7c7a3",
+      "order_number": "ORD-20250831-001",
+      "file_name": "Screenshot 2025-08-28 at 10.32.53 AM.png",
+      "date": "2025-08-31T22:46:04.823864",
+      "number_of_ribs": 3,
+      "straight_rib": true,
+      "shape_explanation": "d. U rib with different side rib length with rotation",
+      "path_degrees": [
+        {
+          "rib_number": 1,
+          "length": 50,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 2,
+          "length": 110,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 3,
+          "length": 50,
+          "degree_to_next": null
+        }
+      ],
+      "path_vectors": [
+        {
+          "rib_number": 1,
+          "dx": 0,
+          "dy": 50
+        },
+        {
+          "rib_number": 2,
+          "dx": 110,
+          "dy": 0
+        },
+        {
+          "rib_number": 3,
+          "dx": 0,
+          "dy": -50
+        }
+      ],
+      "compatible_catalog_shape": {
+        "best_match_file": "shape 000.png",
+        "similarity_score": 40,
+        "match_quality": "POOR",
+        "is_compatible": false,
+        "differences": [
+          "Input shape has 3 ribs, catalog shape has 1 rib"
+        ]
+      }
+    }
+  ]
+}

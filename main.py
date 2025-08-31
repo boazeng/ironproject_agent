@@ -1,7 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
-from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent, create_rib_finder_agent, create_pathfinder_agent
+from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent, create_rib_finder_agent, create_pathfinder_agent, create_dataoutput_agent
 
 # Set UTF-8 encoding for Windows
 if sys.platform == "win32":
@@ -462,6 +462,10 @@ def main():
     pathfinder = create_pathfinder_agent(api_key)  # PATHFINDER
     print("[🦾 IRONMAN]   ✓ PATHFINDER (Path Vector Agent) created and ready")
     
+    print("[🦾 IRONMAN]   → Initializing DATAOUTPUT (Database Storage Manager)...")
+    dataoutput = create_dataoutput_agent("data")  # DATAOUTPUT
+    print("[🦾 IRONMAN]   ✓ DATAOUTPUT (Database Agent) created and ready")
+    
     # Check for input files
     print("\n[🦾 IRONMAN] Scanning input directory...")
     input_dir = "io/input"
@@ -514,6 +518,30 @@ def main():
             
             if user_approved:
                 print(f"[🦾 IRONMAN] Results validated for {file}")
+                
+                # Store results in database using DATAOUTPUT agent
+                print(f"\n[🦾 IRONMAN] [STEP 7] Storing results in database...")
+                print("[🦾 IRONMAN]   → Sending to DATAOUTPUT (Database Storage)")
+                
+                # Generate order number (could be enhanced with proper order management)
+                from datetime import datetime
+                order_number = f"ORD-{datetime.now().strftime('%Y%m%d')}-{i:03d}"
+                
+                storage_result = dataoutput.process_and_store(
+                    order_number=order_number,
+                    file_name=file,
+                    analysis_results=result
+                )
+                
+                if storage_result['status'] == 'success':
+                    print(f"[🦾 IRONMAN]   ✓ Data stored successfully")
+                    print(f"[🦾 IRONMAN]   → Order Number: {order_number}")
+                    print(f"[🦾 IRONMAN]   → Record ID: {storage_result['record_id']}")
+                    result['order_number'] = order_number
+                    result['database_id'] = storage_result['record_id']
+                else:
+                    print(f"[🦾 IRONMAN]   ⚠ Storage failed: {storage_result.get('message', 'Unknown error')}")
+                
                 break
             else:
                 retry_count += 1
@@ -647,6 +675,12 @@ def main():
                     print(f"PATHFINDER: error - {pathfinder_data['error']}")
                 else:
                     print("PATHFINDER: no analysis available")
+            
+            # Database storage status
+            if "order_number" in result:
+                print(f"DATABASE: Order {result['order_number']} - Record ID: {result.get('database_id', 'N/A')}")
+            else:
+                print("DATABASE: Not stored")
     
     print("\n[🦾 IRONMAN] System workflow completed successfully")
     print("="*60)

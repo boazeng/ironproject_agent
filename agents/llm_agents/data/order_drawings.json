@@ -1,0 +1,96 @@
+{
+  "metadata": {
+    "created": "2025-08-31T22:35:39.832704",
+    "description": "Iron order drawing analysis results",
+    "total_records": 2,
+    "last_updated": "2025-08-31T22:36:22.497946"
+  },
+  "drawings": [
+    {
+      "id": "7dab0a2e-79bf-445b-8a7a-f81ef90b0832",
+      "order_number": "TEST-ORDER-001",
+      "file_name": "test_drawing.png",
+      "date": "2025-08-31T22:35:39.849284",
+      "number_of_ribs": 3,
+      "straight_rib": true,
+      "shape_explanation": "d. U rib with different side rib length with rotation",
+      "path_degrees": [
+        {
+          "rib_number": 1,
+          "length": 50,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 2,
+          "length": 110,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 3,
+          "length": 50,
+          "degree_to_next": null
+        }
+      ],
+      "path_vectors": [
+        {
+          "rib_number": 1,
+          "dx": 0,
+          "dy": 50
+        },
+        {
+          "rib_number": 2,
+          "dx": 110,
+          "dy": 0
+        },
+        {
+          "rib_number": 3,
+          "dx": 0,
+          "dy": -50
+        }
+      ]
+    },
+    {
+      "id": "3a31e0b4-0783-4c59-a891-605787d5fbf7",
+      "order_number": "TEST-ORDER-001",
+      "file_name": "test_drawing.png",
+      "date": "2025-08-31T22:36:22.497910",
+      "number_of_ribs": 3,
+      "straight_rib": true,
+      "shape_explanation": "d. U rib with different side rib length with rotation",
+      "path_degrees": [
+        {
+          "rib_number": 1,
+          "length": 50,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 2,
+          "length": 110,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 3,
+          "length": 50,
+          "degree_to_next": null
+        }
+      ],
+      "path_vectors": [
+        {
+          "rib_number": 1,
+          "dx": 0,
+          "dy": 50
+        },
+        {
+          "rib_number": 2,
+          "dx": 110,
+          "dy": 0
+        },
+        {
+          "rib_number": 3,
+          "dx": 0,
+          "dy": -50
+        }
+      ]
+    }
+  ]
+}
