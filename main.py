@@ -68,6 +68,7 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare):
     print(f"[🦾 IRONMAN]   → Transferring image to CHATAN with established rib count: {rib_count}")
     print(f"[🦾 IRONMAN]   → CHATAN will use RIBFINDER's accurate count ({rib_count} ribs)")
     
+    # Use dual vision analysis for CHATAN with RIBFINDER's established rib count
     result = chat_analyse.analyze_with_rib_count(file_path, rib_result)
     
     print("[🦾 IRONMAN]   ✓ Response received from CHATAN")
@@ -528,7 +529,15 @@ def main():
             
             # CHATAN results
             chatan_count = result.get('number_of_ribs', 0)
+            chatan_match_percentage = result.get('match_percentage', 0)
+            chatan_vision_agreement = result.get('vision_agreement', 'UNKNOWN')
             print(f"CHATAN: number of ribs - {chatan_count}")
+            print(f"        match percentage - {chatan_match_percentage}% ({chatan_vision_agreement})")
+            
+            # Show Google Vision data if available
+            google_vision_data = result.get('google_vision_data')
+            if google_vision_data and 'dimensions' in google_vision_data:
+                print(f"        Google Vision dimensions: {google_vision_data.get('dimensions', [])}")
             
             sides = result.get('sides', [])
             if sides:

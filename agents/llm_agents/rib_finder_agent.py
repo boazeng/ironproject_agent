@@ -7,19 +7,21 @@ from typing import Dict
 import requests
 from google.cloud import vision
 import io
+import anthropic
 
 class RibFinderAgent:
     """
     Specialized agent that uses high-end ChatGPT to accurately count ribs in bent iron drawings
     """
     
-    def __init__(self, api_key, google_vision_api_key=None):
+    def __init__(self, api_key, google_vision_api_key=None, anthropic_api_key=None):
         """
-        Initialize the RibFinder agent with premium model and Google Vision
+        Initialize the RibFinder agent with premium models from OpenAI, Google, and Anthropic
         
         Args:
             api_key: OpenAI API key
             google_vision_api_key: Google Vision API key (optional)
+            anthropic_api_key: Anthropic Claude API key (optional)
         """
         # Initialize OpenAI client
         self.client = OpenAI(api_key=api_key)
@@ -28,6 +30,17 @@ class RibFinderAgent:
         # Initialize Google Vision API
         self.google_vision_api_key = google_vision_api_key or os.getenv("GOOGLE_VISION_API_KEY")
         self.google_credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        
+        # Initialize Anthropic Claude client
+        self.anthropic_api_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+        self.claude_client = None
+        if self.anthropic_api_key and self.anthropic_api_key != "your_anthropic_api_key_here":
+            try:
+                self.claude_client = anthropic.Anthropic(api_key=self.anthropic_api_key)
+                print("[RIBFINDER] Claude Vision API initialized")
+            except Exception as e:
+                print(f"[RIBFINDER] Claude Vision API initialization failed: {e}")
+                self.claude_client = None
         
         # Initialize Google Vision client if credentials available
         self.vision_client = None
@@ -132,6 +145,93 @@ class RibFinderAgent:
             
         except Exception as e:
             print(f"[RIBFINDER] Google Vision analysis failed: {e}")
+            return None
+    
+    def analyze_with_claude_vision(self, image_path: str) -> int:
+        """
+        Analyze image with Claude Vision API to count ribs
+        
+        Args:
+            image_path: Path to the drawing image
+            
+        Returns:
+            Number of ribs detected by Claude Vision
+        """
+        try:
+            if not self.claude_client:
+                return None
+                
+            # Read and encode the image
+            with open(image_path, 'rb') as image_file:
+                image_data = base64.b64encode(image_file.read()).decode('utf-8')
+            
+            # Get image MIME type
+            mime_type = "image/png" if image_path.endswith('.png') else "image/jpeg"
+            
+            # Send to Claude Vision API
+            response = self.claude_client.messages.create(
+                model="claude-3-5-sonnet-20241022",  # Latest Claude model with vision
+                max_tokens=1024,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": """You are an expert at analyzing bent iron construction drawings.
+                                
+                                Your ONLY task is to count the number of ribs (straight segments) in this bent iron shape.
+                                
+                                CRITICAL INSTRUCTIONS:
+                                1. A rib is ANY straight segment between bends
+                                2. Count ALL straight segments systematically
+                                3. Common patterns:
+                                   - L-shape = 2 ribs
+                                   - U-shape = 3 ribs
+                                   - Z-shape = 3 ribs
+                                   - Complex shapes = 4+ ribs
+                                
+                                Look for vertical segments on BOTH ends of horizontal segments.
+                                If you see |___| pattern, that's 3 ribs (U-shape).
+                                
+                                Return ONLY a JSON object: {"rib_count": number}"""
+                            },
+                            {
+                                "type": "image",
+                                "source": {
+                                    "type": "base64",
+                                    "media_type": mime_type,
+                                    "data": image_data
+                                }
+                            }
+                        ]
+                    }
+                ]
+            )
+            
+            # Parse response
+            result_text = response.content[0].text
+            
+            # Try to parse JSON
+            try:
+                if "```json" in result_text:
+                    result_text = result_text.split("```json")[1].split("```")[0]
+                elif "```" in result_text:
+                    result_text = result_text.split("```")[1].split("```")[0]
+                
+                result = json.loads(result_text.strip())
+                return result.get("rib_count", None)
+                
+            except json.JSONDecodeError:
+                # Try to extract number from text
+                import re
+                numbers = re.findall(r'\b(\d+)\b', result_text)
+                if numbers:
+                    return int(numbers[0])
+                return None
+                
+        except Exception as e:
+            print(f"[RIBFINDER] Claude Vision analysis failed: {e}")
             return None
     
     def count_ribs(self, image_path: str) -> Dict:
@@ -282,25 +382,70 @@ class RibFinderAgent:
             chatgpt_count = result.get("rib_count", 0)
             print(f"[RIBFINDER] ChatGPT detected: {chatgpt_count} ribs")
             
-            # Calculate match percentage
-            if google_vision_count is not None:
-                if google_vision_count == chatgpt_count:
-                    match_percentage = 100
-                    print(f"[RIBFINDER] ✓ AGREEMENT: Both systems detected {chatgpt_count} ribs (100% match)")
+            # Initialize Claude count
+            claude_count = None
+            
+            # Check if Google Vision and ChatGPT disagree - if so, use Claude as tie-breaker
+            if google_vision_count is not None and google_vision_count != chatgpt_count:
+                print(f"[RIBFINDER] ⚠ DISAGREEMENT: Google={google_vision_count}, ChatGPT={chatgpt_count}")
+                
+                # Use Claude Vision as tie-breaker if available
+                if self.claude_client:
+                    print("[RIBFINDER] Using Claude Vision as tie-breaker...")
+                    claude_count = self.analyze_with_claude_vision(image_path)
+                    if claude_count:
+                        print(f"[RIBFINDER] Claude detected: {claude_count} ribs")
+                        
+                        # Determine final count based on agreement
+                        if claude_count == chatgpt_count:
+                            print(f"[RIBFINDER] ✓ RESOLUTION: Claude agrees with ChatGPT ({chatgpt_count} ribs)")
+                            result["rib_count"] = chatgpt_count
+                            match_percentage = 67  # 2 out of 3 agree
+                            result["vision_agreement"] = "MAJORITY_CHATGPT_CLAUDE"
+                        elif claude_count == google_vision_count:
+                            print(f"[RIBFINDER] ✓ RESOLUTION: Claude agrees with Google ({google_vision_count} ribs)")
+                            result["rib_count"] = google_vision_count
+                            match_percentage = 67  # 2 out of 3 agree
+                            result["vision_agreement"] = "MAJORITY_GOOGLE_CLAUDE"
+                        else:
+                            print(f"[RIBFINDER] ⚠ NO CONSENSUS: All three systems disagree!")
+                            print(f"  Google={google_vision_count}, ChatGPT={chatgpt_count}, Claude={claude_count}")
+                            # Use ChatGPT as default but with low confidence
+                            result["rib_count"] = chatgpt_count
+                            match_percentage = 33  # All disagree
+                            result["vision_agreement"] = "ALL_DISAGREE"
+                        
+                        # Store all counts for transparency
+                        result["google_vision_count"] = google_vision_count
+                        result["chatgpt_count"] = chatgpt_count
+                        result["claude_count"] = claude_count
+                    else:
+                        # Claude failed, stick with original disagreement
+                        match_percentage = 50
+                        result["vision_agreement"] = "DISAGREE_NO_TIEBREAKER"
+                        result["google_vision_count"] = google_vision_count
+                        result["chatgpt_count"] = chatgpt_count
                 else:
+                    # No Claude available for tie-breaking
                     match_percentage = 50
-                    print(f"[RIBFINDER] ⚠ DISAGREEMENT: Google Vision={google_vision_count}, ChatGPT={chatgpt_count} (50% match)")
-                    # Use ChatGPT's count as primary but note the disagreement
+                    result["vision_agreement"] = "DISAGREE_NO_TIEBREAKER"
                     result["google_vision_count"] = google_vision_count
                     result["chatgpt_count"] = chatgpt_count
-            else:
+                    
+            elif google_vision_count is not None and google_vision_count == chatgpt_count:
+                # Google and ChatGPT agree - perfect!
+                match_percentage = 100
+                print(f"[RIBFINDER] ✓ AGREEMENT: Both systems detected {chatgpt_count} ribs (100% match)")
+                result["vision_agreement"] = "AGREE"
+                
+            elif google_vision_count is None:
                 # Only ChatGPT available
                 match_percentage = 75  # Single source confidence
                 print(f"[RIBFINDER] ChatGPT only: {chatgpt_count} ribs (75% - single source)")
+                result["vision_agreement"] = "SINGLE_SOURCE"
             
             # Add match percentage to result
             result["match_percentage"] = match_percentage
-            result["vision_agreement"] = "AGREE" if match_percentage == 100 else "DISAGREE" if match_percentage == 50 else "SINGLE_SOURCE"
             
             print(f"[RIBFINDER] Analysis complete - Match: {match_percentage}%")
             

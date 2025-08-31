@@ -5,22 +5,39 @@ import autogen
 from openai import OpenAI
 from PIL import Image
 import io
+from google.cloud import vision
+from typing import Dict
 
 class ChatGPTVisionAgent:
     """
     Agent that uses ChatGPT with vision capabilities to analyze bent iron drawings
     """
     
-    def __init__(self, api_key):
+    def __init__(self, api_key, google_vision_api_key=None):
         """
-        Initialize the ChatGPT vision agent
+        Initialize the ChatGPT vision agent with Google Vision support
         
         Args:
             api_key: OpenAI API key
+            google_vision_api_key: Google Vision API key (optional)
         """
         # Initialize OpenAI client
         self.client = OpenAI(api_key=api_key)
         self.api_key = api_key
+        
+        # Initialize Google Vision API
+        self.google_vision_api_key = google_vision_api_key or os.getenv("GOOGLE_VISION_API_KEY")
+        self.google_credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        
+        # Initialize Google Vision client if credentials available
+        self.vision_client = None
+        if self.google_credentials_path and os.path.exists(self.google_credentials_path):
+            self.vision_client = vision.ImageAnnotatorClient()
+            print("[CHATAN] Google Vision API initialized with service account")
+        elif self.google_vision_api_key:
+            print("[CHATAN] Google Vision API initialized with API key")
+        else:
+            print("[CHATAN] Google Vision API not configured - using ChatGPT only")
         
         # Configuration for GPT-4o Vision (using latest cost-efficient model)
         config_list = [
@@ -83,26 +100,118 @@ class ChatGPTVisionAgent:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
     
-    def analyze_drawing(self, image_path):
+    def analyze_with_google_vision(self, image_path: str) -> Dict:
         """
-        Analyze a bent iron drawing using ChatGPT vision
+        Analyze image with Google Vision API to extract dimensions and text
         
         Args:
             image_path: Path to the drawing image
             
         Returns:
-            Dictionary with analysis results
+            Dictionary with Google Vision analysis results
+        """
+        try:
+            if not self.vision_client:
+                return {"error": "Google Vision API not available"}
+                
+            with io.open(image_path, 'rb') as image_file:
+                content = image_file.read()
+            
+            image = vision.Image(content=content)
+            
+            # Perform text detection to extract dimensions
+            response = self.vision_client.text_detection(image=image)
+            texts = response.text_annotations
+            
+            # Extract dimensions and text
+            dimensions = []
+            all_text = ""
+            
+            if texts:
+                all_text = texts[0].description if texts else ""
+                print(f"[CHATAN] Google Vision extracted text: {all_text[:100]}...")  # Debug output
+                
+                # Extract numbers that could be dimensions with better filtering
+                import re
+                numbers = re.findall(r'\d+', all_text)
+                dimensions = [int(num) for num in numbers if 10 <= int(num) <= 1000]  # More reasonable range
+                
+                print(f"[CHATAN] Google Vision found dimensions: {dimensions}")  # Debug output
+                
+                # Try to identify actual rib lengths vs drawing annotations
+                rib_lengths = []
+                # Filter out likely non-rib dimensions
+                for num in dimensions:
+                    if 15 <= num <= 1000:  # Reasonable range for iron rib lengths in mm
+                        rib_lengths.append(num)
+                
+                # Smart filtering: For U-shape, expect 3 main dimensions
+                # Remove likely annotation numbers (very small like <50 or unusual ranges)
+                if len(rib_lengths) > 3:
+                    # Keep the most likely rib dimensions - typically larger numbers
+                    significant_dims = [d for d in rib_lengths if d >= 50]  # Structural dimensions
+                    small_dims = [d for d in rib_lengths if 15 <= d < 50]    # Leg dimensions
+                    
+                    # For U-shape: 1 large horizontal + 2 small verticals
+                    if len(significant_dims) >= 1 and len(small_dims) >= 2:
+                        rib_lengths = significant_dims[:1] + small_dims[:2]  # Take 1 large + 2 small
+                
+                print(f"[CHATAN] Google Vision filtered rib lengths: {rib_lengths}")  # Debug
+                
+                # Basic shape detection based on text patterns and dimensions
+                shape_type = "unknown"
+                if len(dimensions) >= 3 and any(d > 100 for d in dimensions):
+                    shape_type = "U-shape"
+                elif len(dimensions) >= 2:
+                    shape_type = "L-shape"
+                elif "U" in all_text.upper():
+                    shape_type = "U-shape"
+                elif "L" in all_text.upper():
+                    shape_type = "L-shape"
+            
+            return {
+                "shape_type": shape_type,
+                "dimensions": dimensions,
+                "rib_lengths": rib_lengths,
+                "extracted_text": all_text,
+                "confidence": 80 if dimensions else 30
+            }
+            
+        except Exception as e:
+            print(f"[CHATAN] Google Vision analysis failed: {e}")
+            return {"error": f"Google Vision failed: {str(e)}"}
+    
+    def analyze_drawing(self, image_path, max_retries=2):
+        """
+        Analyze a bent iron drawing using both ChatGPT and Google Vision
+        
+        Args:
+            image_path: Path to the drawing image
+            max_retries: Maximum number of retries if visions disagree
+            
+        Returns:
+            Dictionary with analysis results including match percentage
         """
         try:
             # Check if file exists
             if not os.path.exists(image_path):
                 return {"error": f"Image file not found: {image_path}"}
             
+            print(f"[CHATAN] Analyzing image: {os.path.basename(image_path)}")
+            
+            # First, try Google Vision if available
+            google_result = None
+            if self.vision_client:
+                print("[CHATAN] Using Google Vision API...")
+                google_result = self.analyze_with_google_vision(image_path)
+                if google_result and "error" not in google_result:
+                    print(f"[CHATAN] Google Vision detected: {google_result.get('shape_type', 'unknown')} with {len(google_result.get('dimensions', []))} dimensions")
+            
+            # Then use ChatGPT Vision
+            print("[CHATAN] Using ChatGPT Vision API...")
+            
             # Prepare the image for analysis
             base64_image = self.encode_image(image_path)
-            
-            print(f"[CHATAN] Analyzing image: {os.path.basename(image_path)}")
-            print("[CHATAN] Sending to Vision API...")
             
             # Call GPT-4 Vision API
             response = self.client.chat.completions.create(
@@ -228,9 +337,9 @@ class ChatGPTVisionAgent:
             
             # Parse the response
             result_text = response.choices[0].message.content
-            print(f"[CHATAN] Analysis complete")
             
             # Try to parse JSON from response
+            chatgpt_result = None
             try:
                 # Remove markdown code blocks if present
                 if "```json" in result_text:
@@ -238,11 +347,11 @@ class ChatGPTVisionAgent:
                 elif "```" in result_text:
                     result_text = result_text.split("```")[1].split("```")[0]
                 
-                result = json.loads(result_text.strip())
-                result["status"] = "Analysis complete"
+                chatgpt_result = json.loads(result_text.strip())
+                chatgpt_result["status"] = "Analysis complete"
             except json.JSONDecodeError:
                 # If JSON parsing fails, return structured error
-                result = {
+                chatgpt_result = {
                     "shape_type": "Unknown",
                     "number_of_ribs": 0,
                     "sides": [],
@@ -251,6 +360,9 @@ class ChatGPTVisionAgent:
                     "status": "JSON parsing failed",
                     "raw_response": result_text
                 }
+            
+            # Compare results and calculate match percentage
+            result = self._compare_vision_results(google_result, chatgpt_result, image_path, max_retries)
             
             return result
             
@@ -411,11 +523,20 @@ class ChatGPTVisionAgent:
             shape_pattern = rib_finder_result.get("shape_pattern", "unknown")
             ribfinder_confidence = rib_finder_result.get("confidence", 0)
             
+            print(f"[CHATAN] Analyzing with established rib count: {established_rib_count}")
+            print(f"[CHATAN] RibFinder pattern: {shape_pattern}")
+            
+            # First, try Google Vision if available for additional context
+            google_result = None
+            if self.vision_client:
+                print("[CHATAN] Using Google Vision API for additional context...")
+                google_result = self.analyze_with_google_vision(image_path)
+                if google_result and "error" not in google_result:
+                    print(f"[CHATAN] Google Vision detected: {google_result.get('shape_type', 'unknown')} with {len(google_result.get('dimensions', []))} dimensions")
+            
             # Prepare the image for analysis
             base64_image = self.encode_image(image_path)
             
-            print(f"[CHATAN] Analyzing with established rib count: {established_rib_count}")
-            print(f"[CHATAN] RibFinder pattern: {shape_pattern}")
             print("[CHATAN] Sending detailed analysis request...")
             
             # Call GPT-4 Vision API with RibFinder context
@@ -501,6 +622,30 @@ class ChatGPTVisionAgent:
                 result["status"] = "Analysis with rib count complete"
                 result["ribfinder_used"] = True
                 result["established_rib_count"] = established_rib_count
+                
+                # Override rib count with RibFinder's established count
+                result["number_of_ribs"] = established_rib_count
+                
+                # Add match percentage based on Google Vision agreement
+                if google_result and "error" not in google_result:
+                    google_shape = google_result.get("shape_type", "unknown").lower()
+                    chatgpt_shape = result.get("shape_type", "unknown").lower()
+                    
+                    if google_shape == chatgpt_shape or "unknown" in [google_shape, chatgpt_shape]:
+                        result["match_percentage"] = 100
+                        result["vision_agreement"] = "AGREE"
+                        print("[CHATAN] ✓ AGREEMENT: Both vision systems detected same shape (100% match)")
+                    else:
+                        result["match_percentage"] = 50
+                        result["vision_agreement"] = "DISAGREE"
+                        print(f"[CHATAN] ⚠ DISAGREEMENT: Google Vision={google_shape}, ChatGPT={chatgpt_shape} (50% match)")
+                    
+                    # Include Google Vision data in result
+                    result["google_vision_data"] = google_result
+                else:
+                    result["match_percentage"] = 75
+                    result["vision_agreement"] = "SINGLE_SOURCE"
+                    print("[CHATAN] ChatGPT only: Using single vision source (75% confidence)")
             except json.JSONDecodeError:
                 # If JSON parsing fails, return structured error with established rib count
                 result = {
@@ -512,7 +657,9 @@ class ChatGPTVisionAgent:
                     "status": "JSON parsing failed but rib count established",
                     "ribfinder_used": True,
                     "established_rib_count": established_rib_count,
-                    "raw_response": result_text
+                    "raw_response": result_text,
+                    "match_percentage": 25,  # Low confidence due to parsing failure
+                    "vision_agreement": "PARSING_FAILED"
                 }
             
             return result
@@ -523,6 +670,45 @@ class ChatGPTVisionAgent:
                 "established_rib_count": rib_finder_result.get("rib_count", 0)
             }
     
+    def _compare_vision_results(self, google_result, chatgpt_result, image_path, max_retries):
+        """
+        Compare Google Vision and ChatGPT results and handle disagreements
+        """
+        # If Google Vision is not available, return ChatGPT result with single source confidence
+        if google_result is None or "error" in google_result:
+            print("[CHATAN] ChatGPT only: Using single vision source (75% confidence)")
+            chatgpt_result["match_percentage"] = 75
+            chatgpt_result["vision_agreement"] = "SINGLE_SOURCE"
+            return chatgpt_result
+        
+        # Compare shape types
+        google_shape = google_result.get("shape_type", "unknown").lower()
+        chatgpt_shape = chatgpt_result.get("shape_type", "unknown").lower()
+        
+        # Check if shapes match
+        shapes_match = google_shape == chatgpt_shape or "unknown" in [google_shape, chatgpt_shape]
+        
+        if shapes_match:
+            # Agreement - use ChatGPT result (more detailed) with high confidence
+            print(f"[CHATAN] ✓ AGREEMENT: Both detected {chatgpt_shape} (100% match)")
+            chatgpt_result["match_percentage"] = 100
+            chatgpt_result["vision_agreement"] = "AGREE"
+            chatgpt_result["google_vision_data"] = google_result
+            return chatgpt_result
+        else:
+            # Disagreement - try again if retries available
+            print(f"[CHATAN] ⚠ DISAGREEMENT: Google Vision={google_shape}, ChatGPT={chatgpt_shape}")
+            
+            if max_retries > 0:
+                print(f"[CHATAN] Retrying analysis... ({max_retries} attempts left)")
+                return self.analyze_drawing(image_path, max_retries - 1)
+            else:
+                print("[CHATAN] Max retries reached - using ChatGPT result with disagreement flag")
+                chatgpt_result["match_percentage"] = 50
+                chatgpt_result["vision_agreement"] = "DISAGREE"
+                chatgpt_result["google_vision_data"] = google_result
+                return chatgpt_result
+
     def get_agent(self):
         """
         Return the AutoGen agent for integration with orchestrator

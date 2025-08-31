@@ -1,5 +1,6 @@
 import os
 import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from dotenv import load_dotenv
 from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent
 
