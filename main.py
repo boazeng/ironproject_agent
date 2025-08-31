@@ -1,7 +1,7 @@
 import os
 import sys
 from dotenv import load_dotenv
-from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent, create_rib_finder_agent
+from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent, create_rib_finder_agent, create_pathfinder_agent
 
 # Set UTF-8 encoding for Windows
 if sys.platform == "win32":
@@ -11,15 +11,16 @@ if sys.platform == "win32":
 # Load environment variables
 load_dotenv()
 
-def process_drawing(file_path, ribfinder, chat_analyse, chat_compare):
+def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder):
     """
-    Process a bent iron drawing using RibFinder, CHATAN, and CHATCO
+    Process a bent iron drawing using RibFinder, CHATAN, CHATCO, and PATHFINDER
     
     Args:
         file_path: Path to the drawing file
         ribfinder: RibFinder agent instance (RIBFINDER)
         chat_analyse: ChatGPT vision agent instance (CHATAN) 
         chat_compare: ChatGPT comparison agent instance (CHATCO)
+        pathfinder: PathFinder agent instance (PATHFINDER)
     
     Returns:
         Dictionary with analysis results and comparison
@@ -106,7 +107,7 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare):
                 description = side.get('description', '')
                 
                 # Build the display line
-                rib_info = f"[🦾 IRONMAN]   Rib {side_num}: {length} mm"
+                rib_info = f"[🦾 IRONMAN]   Rib {side_num}: {length} cm"
                 if description:
                     rib_info += f" ({description})"
                 print(rib_info)
@@ -174,6 +175,51 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare):
                     print(f"[🦾 IRONMAN]     → Angle to next rib: {angle}°")
         
         print("-"*60)
+    
+    # Step 5.5: Extract vector path using PATHFINDER
+    print("\n[🦾 IRONMAN] [STEP 5.5] Extracting vector path with PATHFINDER...")
+    print(f"[🦾 IRONMAN]   → Sending to PATHFINDER (Vector Path Extraction)")
+    print(f"[🦾 IRONMAN]   → Using established rib count: {rib_count} ribs")
+    
+    pathfinder_result = pathfinder.find_path(
+        image_path=file_path,
+        rib_count=rib_count,
+        all_straight=True,
+        ribfinder_data=rib_result,
+        chatan_data=result
+    )
+    
+    if "error" in pathfinder_result:
+        print(f"[🦾 IRONMAN]   ❌ PATHFINDER Error: {pathfinder_result['error']}")
+    else:
+        print(f"[🦾 IRONMAN]   ✓ PATHFINDER analysis complete")
+        print(f"[🦾 IRONMAN]   → Shape Type: {pathfinder_result.get('shape_type', 'Unknown')}")
+        print(f"[🦾 IRONMAN]   → Vertices Found: {pathfinder_result.get('vertex_count', 0)}")
+        print(f"[🦾 IRONMAN]   → Total Path Length: {pathfinder_result.get('total_path_length', 0)} units")
+        print(f"[🦾 IRONMAN]   → Is Closed Shape: {pathfinder_result.get('is_closed', False)}")
+        
+        # Display vector information
+        vectors = pathfinder_result.get('vectors', [])
+        if vectors:
+            print(f"\n[🦾 IRONMAN] PATHFINDER Vector Analysis:")
+            for vec in vectors:
+                rib_num = vec.get('rib_number', '?')
+                length = vec.get('length', 0)
+                angle = vec.get('angle_degrees', 0)
+                print(f"[🦾 IRONMAN]   Vector {rib_num}: Length {length:.1f} units, Angle {angle:.1f}°")
+                if 'bend_angle_to_next' in vec:
+                    bend_angle = vec['bend_angle_to_next']
+                    print(f"[🦾 IRONMAN]     → Bend to next: {bend_angle:.1f}°")
+        
+        # Display bounding box
+        bbox = pathfinder_result.get('path_summary', {}).get('bounding_box', {})
+        if bbox:
+            print(f"[🦾 IRONMAN]   → Bounding Box: {bbox.get('width', 0):.1f} × {bbox.get('height', 0):.1f} units")
+    
+    # Add PathFinder results to main result
+    result["pathfinder"] = pathfinder_result
+    
+    print("-"*60)
     
     # Step 6: Compare with catalog shapes using CHATCO
     print("\n[🦾 IRONMAN] [STEP 6] Comparing with catalog shapes...")
@@ -313,14 +359,16 @@ def validate_results_with_user(result, file_name):
             print("  ✓ Results auto-accepted (non-interactive mode)")
             return True
 
-def reprocess_drawing(file_path, ribfinder, chat_analyse, chat_compare, previous_result, attempt_number):
+def reprocess_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder, previous_result, attempt_number):
     """
     Reprocess a drawing with additional instructions for CHATAN to recheck
     
     Args:
         file_path: Path to the drawing file
+        ribfinder: RibFinder agent instance (RIBFINDER)
         chat_analyse: ChatGPT vision agent instance (CHATAN)
         chat_compare: ChatGPT comparison agent instance (CHATCO)
+        pathfinder: PathFinder agent instance (PATHFINDER)
         previous_result: Previous analysis results that were rejected
         attempt_number: Current attempt number
         
@@ -364,7 +412,7 @@ def reprocess_drawing(file_path, ribfinder, chat_analyse, chat_compare, previous
                 description = side.get('description', '')
                 
                 # Build the display line
-                rib_info = f"[🦾 IRONMAN]   Rib {side_num}: {length} mm"
+                rib_info = f"[🦾 IRONMAN]   Rib {side_num}: {length} cm"
                 if description:
                     rib_info += f" ({description})"
                 print(rib_info)
@@ -410,6 +458,10 @@ def main():
     chat_compare = create_chatgpt_comparison_agent(api_key)  # CHATCO
     print("[🦾 IRONMAN]   ✓ CHATCO (Comparison Agent) created and ready")
     
+    print("[🦾 IRONMAN]   → Initializing PATHFINDER (Vector Path Extraction)...")
+    pathfinder = create_pathfinder_agent(api_key)  # PATHFINDER
+    print("[🦾 IRONMAN]   ✓ PATHFINDER (Path Vector Agent) created and ready")
+    
     # Check for input files
     print("\n[🦾 IRONMAN] Scanning input directory...")
     input_dir = "io/input"
@@ -446,7 +498,7 @@ def main():
         print(f"\n[🦾 IRONMAN] Dispatching file {i}/{len(files)} to RIBFINDER, CHATAN & CHATCO...")
         
         # Initial analysis with RibFinder first
-        result = process_drawing(file_path, ribfinder, chat_analyse, chat_compare)
+        result = process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder)
         
         # Validate results with user
         print(f"\n[🦾 IRONMAN] Requesting user validation for file {i}/{len(files)}")
@@ -470,7 +522,7 @@ def main():
                     print("[🦾 IRONMAN]   → Asking CHATAN to recheck analysis...")
                     
                     # Add instruction for recheck
-                    result = reprocess_drawing(file_path, ribfinder, chat_analyse, chat_compare, result, retry_count)
+                    result = reprocess_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder, result, retry_count)
                 else:
                     print(f"\n[🦾 IRONMAN] Maximum retries reached for {file}")
                     result["status"] = "Max retries reached - user rejected"
@@ -545,7 +597,7 @@ def main():
                     side_num = side.get('side_number', '?')
                     description = side.get('description', 'unknown')
                     length = side.get('length', 0)
-                    print(f"         rib {side_num}: {description}, {length} mm")
+                    print(f"         rib {side_num}: {description}, {length} cm")
             else:
                 print("         no rib details available")
             
@@ -569,6 +621,32 @@ def main():
                     print(f"         reasoning: {reasoning}")
             else:
                 print("CHATCO: no matching shape found")
+            
+            # PATHFINDER results
+            pathfinder_data = result.get('pathfinder', {})
+            if pathfinder_data and "error" not in pathfinder_data:
+                shape_type = pathfinder_data.get('shape_type', 'Unknown')
+                vertex_count = pathfinder_data.get('vertex_count', 0)
+                total_length = pathfinder_data.get('total_path_length', 0)
+                is_closed = pathfinder_data.get('is_closed', False)
+                print(f"PATHFINDER: {shape_type} with {vertex_count} vertices")
+                print(f"            total path length: {total_length} units")
+                print(f"            closed shape: {is_closed}")
+                
+                # Show vector details
+                vectors = pathfinder_data.get('vectors', [])
+                if vectors:
+                    print(f"            vectors:")
+                    for vec in vectors:
+                        rib_num = vec.get('rib_number', '?')
+                        length = vec.get('length', 0)
+                        angle = vec.get('angle_degrees', 0)
+                        print(f"              vector {rib_num}: {length:.1f} units at {angle:.1f}°")
+            else:
+                if pathfinder_data.get("error"):
+                    print(f"PATHFINDER: error - {pathfinder_data['error']}")
+                else:
+                    print("PATHFINDER: no analysis available")
     
     print("\n[🦾 IRONMAN] System workflow completed successfully")
     print("="*60)

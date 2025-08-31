@@ -7,6 +7,11 @@ from PIL import Image
 import io
 from google.cloud import vision
 from typing import Dict
+try:
+    import anthropic
+    ANTHROPIC_AVAILABLE = True
+except ImportError:
+    ANTHROPIC_AVAILABLE = False
 
 class ChatGPTVisionAgent:
     """
@@ -15,7 +20,7 @@ class ChatGPTVisionAgent:
     
     def __init__(self, api_key, google_vision_api_key=None):
         """
-        Initialize the ChatGPT vision agent with Google Vision support
+        Initialize the ChatGPT vision agent with Google Vision and Claude support
         
         Args:
             api_key: OpenAI API key
@@ -38,6 +43,18 @@ class ChatGPTVisionAgent:
             print("[CHATAN] Google Vision API initialized with API key")
         else:
             print("[CHATAN] Google Vision API not configured - using ChatGPT only")
+        
+        # Initialize Claude API for tie-breaking
+        self.claude_client = None
+        if ANTHROPIC_AVAILABLE:
+            claude_api_key = os.getenv("ANTHROPIC_API_KEY")
+            if claude_api_key:
+                self.claude_client = anthropic.Anthropic(api_key=claude_api_key)
+                print("[CHATAN] Claude API initialized for tie-breaking")
+            else:
+                print("[CHATAN] Claude API key not found - tie-breaking unavailable")
+        else:
+            print("[CHATAN] Anthropic library not installed - tie-breaking unavailable")
         
         # Configuration for GPT-4o Vision (using latest cost-efficient model)
         config_list = [
@@ -86,6 +103,85 @@ class ChatGPTVisionAgent:
             Be precise with measurements and indicate if any dimension is unclear.
             """
         )
+    
+    def analyze_with_claude_vision(self, image_path: str, established_rib_count: int, shape_pattern: str) -> Dict:
+        """
+        Analyze drawing with Claude Vision API as tie-breaker
+        
+        Args:
+            image_path: Path to the drawing image
+            established_rib_count: Number of ribs from RibFinder
+            shape_pattern: Shape pattern from RibFinder
+            
+        Returns:
+            Dictionary with Claude's analysis results
+        """
+        if not self.claude_client:
+            return {"error": "Claude API not available"}
+        
+        try:
+            # Read and encode image
+            with open(image_path, "rb") as image_file:
+                image_data = base64.b64encode(image_file.read()).decode('utf-8')
+            
+            # Determine expected shape type based on rib count
+            expected_shape = "U-shape" if established_rib_count == 3 else "L-shape" if established_rib_count == 2 else "Complex"
+            
+            message = self.claude_client.messages.create(
+                model="claude-3-5-sonnet-20240620",
+                max_tokens=500,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"""Analyze this bent iron technical drawing as a tie-breaker between two vision systems.
+
+ESTABLISHED FACTS from RibFinder:
+- Number of ribs: {established_rib_count} 
+- Pattern: {shape_pattern}
+- Expected shape: {expected_shape}
+
+TASK: Determine the shape type and extract dimensions for the {established_rib_count} ribs.
+
+Return ONLY a JSON object:
+{{
+    "shape_type": "string (U-shape, L-shape, etc.)",
+    "dimensions": [list of dimension values found],
+    "rib_count_confirmed": {established_rib_count},
+    "confidence": number (0-100)
+}}"""
+                        },
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": "image/png",
+                                "data": image_data
+                            }
+                        }
+                    ]
+                }]
+            )
+            
+            result_text = message.content[0].text
+            print(f"[CHATAN] Claude Vision analysis complete")
+            
+            # Parse JSON response
+            try:
+                if "```json" in result_text:
+                    result_text = result_text.split("```json")[1].split("```")[0]
+                elif "```" in result_text:
+                    result_text = result_text.split("```")[1].split("```")[0]
+                
+                result = json.loads(result_text.strip())
+                return result
+            except json.JSONDecodeError:
+                return {"error": "Claude JSON parsing failed", "raw_response": result_text}
+                
+        except Exception as e:
+            print(f"[CHATAN] Claude Vision API error: {e}")
+            return {"error": f"Claude Vision failed: {str(e)}"}
     
     def encode_image(self, image_path):
         """
@@ -561,6 +657,7 @@ class ChatGPTVisionAgent:
                         4. Determine angles between ribs
                         5. Provide descriptive names for each rib
                         6. Identify overall shape type based on the {established_rib_count} ribs
+                        7. ALL DIMENSIONS ARE IN CENTIMETERS (cm) - report all lengths in cm
                         
                         **CRITICAL INSTRUCTIONS**:
                         - Use EXACTLY {established_rib_count} ribs in your analysis
@@ -576,7 +673,7 @@ class ChatGPTVisionAgent:
                             "sides": [
                                 {{
                                     "side_number": number,
-                                    "length": number,
+                                    "length": number (in cm),
                                     "angle_to_next": number,
                                     "description": "string (e.g., left leg, base, right leg)"
                                 }}
@@ -590,7 +687,7 @@ class ChatGPTVisionAgent:
                         "content": [
                             {
                                 "type": "text",
-                                "text": f"Analyze this bent iron drawing in detail. RibFinder has already determined this has EXACTLY {established_rib_count} ribs with pattern '{shape_pattern}'. Your job is to extract PRECISE dimensions for these {established_rib_count} ribs. CRITICAL: Look carefully at ALL dimension numbers in the drawing - different ribs may have different lengths. For example, horizontal segments might be labeled differently than vertical segments. Read every number visible in the drawing and match it to the correct rib."
+                                "text": f"Analyze this bent iron drawing in detail. RibFinder has already determined this has EXACTLY {established_rib_count} ribs with pattern '{shape_pattern}'. Your job is to extract PRECISE dimensions for these {established_rib_count} ribs.\n\nIMPORTANT CONTEXT: Google Vision detected these dimension values in the image: {google_result.get('dimensions', []) if google_result else 'No Google Vision data'}.\n\nCRITICAL INSTRUCTIONS:\n1. Look carefully at ALL dimension numbers in the drawing\n2. Different ribs may have different lengths - don't assume they're all the same\n3. For U-shapes: horizontal base typically differs from vertical legs\n4. Match each visible number to the correct rib segment\n5. If you see values like [503, 10], the larger value (503) is usually the horizontal base, smaller values (10) are usually the vertical legs\n6. ALL DIMENSIONS ARE IN CENTIMETERS (cm) - report all measurements in cm\n\nExtract the exact dimensions for each of the {established_rib_count} ribs."
                             },
                             {
                                 "type": "image_url",
@@ -639,6 +736,50 @@ class ChatGPTVisionAgent:
                         result["match_percentage"] = 50
                         result["vision_agreement"] = "DISAGREE"
                         print(f"[CHATAN] ⚠ DISAGREEMENT: Google Vision={google_shape}, ChatGPT={chatgpt_shape} (50% match)")
+                        
+                        # Use Claude as tie-breaker if available
+                        if self.claude_client:
+                            print("[CHATAN] Using Claude Vision as tie-breaker...")
+                            claude_result = self.analyze_with_claude_vision(image_path, established_rib_count, shape_pattern)
+                            
+                            if claude_result and "error" not in claude_result:
+                                claude_shape = claude_result.get("shape_type", "unknown").lower()
+                                print(f"[CHATAN] Claude detected: {claude_shape}")
+                                
+                                # Determine which vision system agrees with Claude
+                                google_agrees = claude_shape == google_shape
+                                chatgpt_agrees = claude_shape == chatgpt_shape
+                                
+                                if google_agrees and chatgpt_agrees:
+                                    # All three agree (shouldn't happen in disagreement case)
+                                    result["match_percentage"] = 100
+                                    result["vision_agreement"] = "ALL_AGREE"
+                                    print("[CHATAN] ✓ All three systems agree after tie-breaker")
+                                elif google_agrees:
+                                    # Google Vision + Claude agree
+                                    result["match_percentage"] = 67
+                                    result["vision_agreement"] = "GOOGLE_CLAUDE_AGREE"
+                                    print(f"[CHATAN] Google Vision + Claude agree on {google_shape} (67% match)")
+                                    # Update result to use Google's shape
+                                    result["shape_type"] = google_result.get("shape_type", result["shape_type"])
+                                elif chatgpt_agrees:
+                                    # ChatGPT + Claude agree  
+                                    result["match_percentage"] = 67
+                                    result["vision_agreement"] = "CHATGPT_CLAUDE_AGREE"
+                                    print(f"[CHATAN] ChatGPT + Claude agree on {chatgpt_shape} (67% match)")
+                                    # Keep ChatGPT result as is
+                                else:
+                                    # All three disagree
+                                    result["match_percentage"] = 33
+                                    result["vision_agreement"] = "ALL_DISAGREE" 
+                                    print(f"[CHATAN] All three systems disagree: Google={google_shape}, ChatGPT={chatgpt_shape}, Claude={claude_shape} (33% match)")
+                                
+                                # Include Claude result in response
+                                result["claude_vision_data"] = claude_result
+                            else:
+                                print("[CHATAN] Claude tie-breaker failed, keeping 50% match")
+                        else:
+                            print("[CHATAN] No Claude tie-breaker available, keeping 50% match")
                     
                     # Include Google Vision data in result
                     result["google_vision_data"] = google_result
