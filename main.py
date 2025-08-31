@@ -2,6 +2,7 @@ import os
 import sys
 from dotenv import load_dotenv
 from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent, create_rib_finder_agent, create_pathfinder_agent, create_dataoutput_agent
+from utils.logger import IronManLogger
 
 # Set UTF-8 encoding for Windows
 if sys.platform == "win32":
@@ -11,7 +12,7 @@ if sys.platform == "win32":
 # Load environment variables
 load_dotenv()
 
-def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder):
+def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder, logger):
     """
     Process a bent iron drawing using RibFinder, CHATAN, CHATCO, and PATHFINDER
     
@@ -21,6 +22,7 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
         chat_analyse: ChatGPT vision agent instance (CHATAN) 
         chat_compare: ChatGPT comparison agent instance (CHATCO)
         pathfinder: PathFinder agent instance (PATHFINDER)
+        logger: Logger instance for workflow tracking
     
     Returns:
         Dictionary with analysis results and comparison
@@ -42,6 +44,8 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     print("[🦾 IRONMAN]   → Sending to RIBFINDER (Premium Agent)")
     print("[🦾 IRONMAN]   → Using GPT-4o for maximum rib counting accuracy...")
     
+    logger.log_step_start(2, "Counting ribs with RIBFINDER", "RIBFINDER")
+    
     rib_result = ribfinder.count_ribs(file_path)
     
     if "error" in rib_result:
@@ -59,6 +63,8 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     print(f"[🦾 IRONMAN]   → Confidence: {confidence}%")
     print(f"[🦾 IRONMAN]   → Vision Match: {match_percentage}% ({vision_agreement})")
     
+    logger.log_agent_output("RIBFINDER", rib_result)
+    
     # Step 3: Prepare for detailed analysis  
     print("\n[🦾 IRONMAN] [STEP 3] Preparing detailed analysis request...")
     print(f"[🦾 IRONMAN]   ✓ File size: {os.path.getsize(file_path) / 1024:.2f} KB")
@@ -69,10 +75,14 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     print(f"[🦾 IRONMAN]   → Transferring image to CHATAN with established rib count: {rib_count}")
     print(f"[🦾 IRONMAN]   → CHATAN will use RIBFINDER's accurate count ({rib_count} ribs)")
     
+    logger.log_step_start(4, "Sending request to CHATAN (Analysis Agent)", "CHATAN")
+    
     # Use dual vision analysis for CHATAN with RIBFINDER's established rib count
     result = chat_analyse.analyze_with_rib_count(file_path, rib_result)
     
     print("[🦾 IRONMAN]   ✓ Response received from CHATAN")
+    
+    logger.log_agent_output("CHATAN", result)
     
     # Add RibFinder results to the main result
     result["ribfinder"] = rib_result
@@ -181,6 +191,8 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     print(f"[🦾 IRONMAN]   → Sending to PATHFINDER (Vector Path Extraction)")
     print(f"[🦾 IRONMAN]   → Using established rib count: {rib_count} ribs")
     
+    logger.log_step_start(5.5, "Extracting vector path with PATHFINDER", "PATHFINDER")
+    
     pathfinder_result = pathfinder.find_path(
         image_path=file_path,
         rib_count=rib_count,
@@ -219,12 +231,17 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     # Add PathFinder results to main result
     result["pathfinder"] = pathfinder_result
     
+    if "error" not in pathfinder_result:
+        logger.log_agent_output("PATHFINDER", pathfinder_result)
+    
     print("-"*60)
     
     # Step 6: Compare with catalog shapes using CHATCO
     print("\n[🦾 IRONMAN] [STEP 6] Comparing with catalog shapes...")
     print("[🦾 IRONMAN]   → Sending to CHATCO (Comparison Agent)")
     print("[🦾 IRONMAN]   → CHATCO analyzing similarity with catalog...")
+    
+    logger.log_step_start(6, "Comparing with catalog shapes", "CHATCO")
     
     comparison_result = chat_compare.compare_with_analysis(file_path, result, "io/catalog")
     
@@ -303,6 +320,8 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
             "differences": best_match.get('differences', []),
             "reasoning": best_match.get('reasoning', '')
         }
+        
+        logger.log_agent_output("CHATCO", result["comparison"])
     else:
         print("[🦾 IRONMAN]   ⚠️ No matching catalog shape found")
         result["comparison"] = {
@@ -311,6 +330,8 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
             "shape_match": False,
             "match_quality": "NO_MATCH"
         }
+        
+        logger.log_agent_output("CHATCO", result["comparison"])
     
     print("-"*60)
     
@@ -430,10 +451,15 @@ def main():
     """
     Main orchestrator for the bent iron recognition system
     """
+    # Initialize logger first
+    logger = IronManLogger()
+    
     print("="*60)
     print("         BENT IRON ORDER RECOGNITION SYSTEM")
     print("="*60)
     print("\n[🦾 IRONMAN] Starting system initialization...")
+    
+    logger.log_system_start()
     
     # Check API key
     print("\n[🦾 IRONMAN] Checking API credentials...")
@@ -449,22 +475,27 @@ def main():
     print("[🦾 IRONMAN]   → Initializing RIBFINDER (Premium Rib Counter)...")
     ribfinder = create_rib_finder_agent(api_key)  # RIBFINDER
     print("[🦾 IRONMAN]   ✓ RIBFINDER (GPT-4o Rib Counter) created and ready")
+    logger.log_agent_creation("RIBFINDER", "GPT-4o Rib Counter")
     
     print("[🦾 IRONMAN]   → Initializing CHATAN (Chat Analyse Agent)...")
     chat_analyse = create_chatgpt_vision_agent(api_key)  # CHATAN
     print("[🦾 IRONMAN]   ✓ CHATAN (Analysis Agent) created and ready")
+    logger.log_agent_creation("CHATAN", "Analysis Agent")
     
     print("[🦾 IRONMAN]   → Initializing CHATCO (Chat Compare Agent)...")
     chat_compare = create_chatgpt_comparison_agent(api_key)  # CHATCO
     print("[🦾 IRONMAN]   ✓ CHATCO (Comparison Agent) created and ready")
+    logger.log_agent_creation("CHATCO", "Comparison Agent")
     
     print("[🦾 IRONMAN]   → Initializing PATHFINDER (Vector Path Extraction)...")
     pathfinder = create_pathfinder_agent(api_key)  # PATHFINDER
     print("[🦾 IRONMAN]   ✓ PATHFINDER (Path Vector Agent) created and ready")
+    logger.log_agent_creation("PATHFINDER", "Vector Path Agent")
     
     print("[🦾 IRONMAN]   → Initializing DATAOUTPUT (Database Storage Manager)...")
     dataoutput = create_dataoutput_agent("data")  # DATAOUTPUT
     print("[🦾 IRONMAN]   ✓ DATAOUTPUT (Database Agent) created and ready")
+    logger.log_agent_creation("DATAOUTPUT", "Database Agent")
     
     # Check for input files
     print("\n[🦾 IRONMAN] Scanning input directory...")
@@ -494,6 +525,8 @@ def main():
         except UnicodeEncodeError:
             print(f"[🦾 IRONMAN]   {i}. {file.encode('ascii', 'ignore').decode('ascii')}")
     
+    logger.log_input_scan(len(files), files)
+    
     # Process each file
     print("\n[🦾 IRONMAN] Starting batch processing...")
     all_results = []
@@ -501,8 +534,10 @@ def main():
         file_path = os.path.join(input_dir, file)
         print(f"\n[🦾 IRONMAN] Dispatching file {i}/{len(files)} to RIBFINDER, CHATAN & CHATCO...")
         
+        logger.log_file_processing_start(file, i, len(files))
+        
         # Initial analysis with RibFinder first
-        result = process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder)
+        result = process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder, logger)
         
         # Validate results with user
         print(f"\n[🦾 IRONMAN] Requesting user validation for file {i}/{len(files)}")
@@ -518,10 +553,13 @@ def main():
             
             if user_approved:
                 print(f"[🦾 IRONMAN] Results validated for {file}")
+                logger.log_validation_result(True)
                 
                 # Store results in database using DATAOUTPUT agent
                 print(f"\n[🦾 IRONMAN] [STEP 7] Storing results in database...")
                 print("[🦾 IRONMAN]   → Sending to DATAOUTPUT (Database Storage)")
+                
+                logger.log_step_start(7, "Storing results in database", "DATAOUTPUT")
                 
                 # Generate order number (could be enhanced with proper order management)
                 from datetime import datetime
@@ -539,12 +577,17 @@ def main():
                     print(f"[🦾 IRONMAN]   → Record ID: {storage_result['record_id']}")
                     result['order_number'] = order_number
                     result['database_id'] = storage_result['record_id']
+                    
+                    logger.log_agent_output("DATAOUTPUT", storage_result)
                 else:
                     print(f"[🦾 IRONMAN]   ⚠ Storage failed: {storage_result.get('message', 'Unknown error')}")
+                    logger.log_error(f"Storage failed: {storage_result.get('message', 'Unknown error')}", "DATAOUTPUT")
                 
                 break
             else:
                 retry_count += 1
+                logger.log_validation_result(False, retry_count)
+                
                 if retry_count < max_retries:
                     print(f"\n[🦾 IRONMAN] Reprocessing attempt {retry_count}/{max_retries-1}")
                     print("[🦾 IRONMAN]   → Asking CHATAN to recheck analysis...")
@@ -559,6 +602,7 @@ def main():
             "file": file,
             "result": result
         })
+        logger.log_file_completion(file, "error" not in result)
         print(f"\n[🦾 IRONMAN] File {i}/{len(files)} processing complete")
     
     # Summary
@@ -682,6 +726,7 @@ def main():
             else:
                 print("DATABASE: Not stored")
     
+    logger.log_system_completion()
     print("\n[🦾 IRONMAN] System workflow completed successfully")
     print("="*60)
 
