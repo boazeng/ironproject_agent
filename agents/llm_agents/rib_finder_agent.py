@@ -8,6 +8,11 @@ import requests
 from google.cloud import vision
 import io
 import anthropic
+import cv2
+import numpy as np
+from skimage import filters, morphology, measure, feature
+import skimage.io as skio
+from scipy.ndimage import label
 
 class RibFinderAgent:
     """
@@ -31,16 +36,9 @@ class RibFinderAgent:
         self.google_vision_api_key = google_vision_api_key or os.getenv("GOOGLE_VISION_API_KEY")
         self.google_credentials_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
         
-        # Initialize Anthropic Claude client
-        self.anthropic_api_key = anthropic_api_key or os.getenv("ANTHROPIC_API_KEY")
+        # Claude Vision API disabled by user request
         self.claude_client = None
-        if self.anthropic_api_key and self.anthropic_api_key != "your_anthropic_api_key_here":
-            try:
-                self.claude_client = anthropic.Anthropic(api_key=self.anthropic_api_key)
-                print("[RIBFINDER] Claude Vision API initialized")
-            except Exception as e:
-                print(f"[RIBFINDER] Claude Vision API initialization failed: {e}")
-                self.claude_client = None
+        print("[RIBFINDER] Claude Vision API disabled")
         
         # Initialize Google Vision client if credentials available
         self.vision_client = None
@@ -170,7 +168,7 @@ class RibFinderAgent:
             
             # Send to Claude Vision API
             response = self.claude_client.messages.create(
-                model="claude-3-5-sonnet-20241022",  # Latest Claude model with vision
+                model="claude-3-haiku-20240307",  # Claude model with vision
                 max_tokens=1024,
                 messages=[
                     {
@@ -234,6 +232,335 @@ class RibFinderAgent:
             print(f"[RIBFINDER] Claude Vision analysis failed: {e}")
             return None
     
+    def analyze_with_opencv_vertices(self, image_path: str) -> int:
+        """
+        Use OpenCV to detect vertices (bend points) in the bent iron drawing
+        
+        Args:
+            image_path: Path to the drawing image
+            
+        Returns:
+            Number of ribs detected based on vertices (or None if failed)
+        """
+        try:
+            # Normalize path for OpenCV (handle Windows paths and spaces)
+            normalized_path = os.path.normpath(image_path)
+            
+            # Check if file exists first
+            if not os.path.exists(normalized_path):
+                print(f"[RIBFINDER] OpenCV error: File not found - {normalized_path}")
+                return None
+            
+            # Try multiple approaches to read the image
+            image = None
+            
+            # Method 1: Direct imread
+            image = cv2.imread(normalized_path)
+            
+            # Method 2: If direct fails, try with forward slashes
+            if image is None:
+                forward_slash_path = normalized_path.replace('\\', '/')
+                image = cv2.imread(forward_slash_path)
+                
+            # Method 3: If still fails, use numpy to read and convert
+            if image is None:
+                print(f"[RIBFINDER] OpenCV imread failed, trying numpy approach...")
+                try:
+                    # Read as bytes and decode with cv2
+                    with open(normalized_path, 'rb') as f:
+                        file_bytes = np.frombuffer(f.read(), dtype=np.uint8)
+                        image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+                except Exception as e:
+                    print(f"[RIBFINDER] Numpy approach also failed: {e}")
+            
+            if image is None:
+                print(f"[RIBFINDER] All methods failed to read image: {normalized_path}")
+                return None
+            else:
+                print(f"[RIBFINDER] OpenCV successfully loaded image")
+                
+            # Convert to grayscale
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            
+            # Apply Gaussian blur to reduce noise
+            blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+            
+            # Use edge detection
+            edges = cv2.Canny(blurred, 50, 150, apertureSize=3)
+            
+            # Find contours
+            contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            
+            if not contours:
+                return None
+            
+            # Find the largest contour (presumably the main iron shape)
+            main_contour = max(contours, key=cv2.contourArea)
+            
+            # Approximate the contour to reduce points
+            epsilon = 0.02 * cv2.arcLength(main_contour, True)
+            approx_contour = cv2.approxPolyDP(main_contour, epsilon, True)
+            
+            # Count vertices (corners)
+            vertices = len(approx_contour)
+            
+            print(f"[RIBFINDER] OpenCV detected {vertices} vertices")
+            
+            # Analyze the shape geometry to determine ribs more accurately
+            if vertices < 3:
+                print(f"[RIBFINDER] OpenCV insufficient vertices: {vertices} (need at least 3)")
+                return None
+            
+            # For bent iron shapes, the number of ribs depends on shape type:
+            # We need to analyze the actual geometry, not just count vertices
+            
+            # Simple heuristic: check if it's more likely L-shape or U-shape
+            # by analyzing the bounding rectangle
+            x, y, w, h = cv2.boundingRect(approx_contour)
+            aspect_ratio = max(w, h) / min(w, h)
+            
+            # If very rectangular (high aspect ratio), likely L-shape
+            # If more square-ish, could be U-shape
+            if aspect_ratio > 10:  # Very long and thin - likely L-shape
+                ribs = 2
+                print(f"[RIBFINDER] OpenCV: High aspect ratio ({aspect_ratio:.1f}) suggests L-shape = 2 ribs")
+            elif vertices == 3:
+                ribs = 2  # True L-shape
+                print(f"[RIBFINDER] OpenCV: 3 vertices = L-shape = 2 ribs")
+            elif vertices == 4:
+                # Could be L-shape with 4 corner points or true U-shape
+                # For now, assume L-shape (more common in this context)
+                ribs = 2
+                print(f"[RIBFINDER] OpenCV: 4 vertices, assuming L-shape = 2 ribs")
+            else:
+                # For more complex shapes
+                ribs = min(vertices - 1, 4)  # Cap at 4 ribs max
+                print(f"[RIBFINDER] OpenCV: {vertices} vertices = {ribs} ribs (complex shape)")
+            
+            return ribs
+                
+        except Exception as e:
+            print(f"[RIBFINDER] OpenCV analysis failed: {e}")
+            return None
+    
+    def analyze_with_scikit_image(self, image_path: str) -> int:
+        """
+        Use Scikit-image to detect ribs through improved line detection and geometric analysis
+        
+        Args:
+            image_path: Path to the drawing image
+            
+        Returns:
+            Number of ribs detected based on advanced analysis (or None if failed)
+        """
+        try:
+            # Normalize path (same as OpenCV)
+            normalized_path = os.path.normpath(image_path)
+            
+            if not os.path.exists(normalized_path):
+                print(f"[RIBFINDER] Scikit-image error: File not found - {normalized_path}")
+                return None
+            
+            # Read image with scikit-image
+            try:
+                # First try skimage.io
+                import skimage.io as skio
+                image = skio.imread(normalized_path)
+            except Exception:
+                # Fallback to opencv + conversion
+                cv_image = cv2.imread(normalized_path)
+                if cv_image is None:
+                    # Use numpy approach
+                    with open(normalized_path, 'rb') as f:
+                        file_bytes = np.frombuffer(f.read(), dtype=np.uint8)
+                        cv_image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+                
+                if cv_image is None:
+                    print(f"[RIBFINDER] Scikit-image failed to load image")
+                    return None
+                    
+                # Convert BGR to RGB for skimage
+                image = cv2.cvtColor(cv_image, cv2.COLOR_BGR2RGB)
+            
+            print(f"[RIBFINDER] Scikit-image loaded image with shape: {image.shape}")
+            
+            # Handle different image formats (RGB, RGBA, grayscale)
+            if len(image.shape) == 3:
+                if image.shape[2] == 4:  # RGBA image
+                    # Convert RGBA to RGB by removing alpha channel
+                    image = image[:, :, :3]
+                    print(f"[RIBFINDER] Converted RGBA to RGB")
+                
+                # Convert to grayscale
+                from skimage.color import rgb2gray
+                gray = rgb2gray(image)
+            else:
+                gray = image
+            
+            # Enhanced preprocessing for better line detection
+            from skimage import restoration, morphology as morph, segmentation
+            
+            # Apply bilateral filter to preserve edges while reducing noise
+            denoised = restoration.denoise_bilateral(gray, sigma_color=0.1, sigma_spatial=15)
+            
+            # Multiple edge detection approaches
+            # Method 1: Enhanced Canny with adaptive thresholds
+            edges_canny = feature.canny(denoised, sigma=1.5, low_threshold=0.05, high_threshold=0.15)
+            
+            # Method 2: Sobel edge detection 
+            from skimage import filters as filt
+            edges_sobel = filt.sobel(denoised) > 0.1
+            
+            # Method 3: Ridge detection for line-like structures
+            ridges = filt.meijering(denoised, sigmas=[1, 2, 3])
+            ridge_binary = ridges > np.percentile(ridges, 85)
+            
+            # Combine edge detection methods
+            combined_edges = np.logical_or(np.logical_or(edges_canny, edges_sobel), ridge_binary)
+            
+            # Clean up edges with morphological operations
+            # Remove small noise
+            cleaned_edges = morph.remove_small_objects(combined_edges, min_size=20)
+            # Fill small gaps in lines
+            cleaned_edges = morph.binary_closing(cleaned_edges, morph.disk(2))
+            
+            # Use Hough Line Transform for robust line detection
+            from skimage.transform import hough_line, hough_line_peaks
+            
+            # Detect lines using Hough transform
+            tested_angles = np.linspace(-np.pi/2, np.pi/2, 180, endpoint=False)
+            hough_space, angles, dists = hough_line(cleaned_edges, theta=tested_angles)
+            
+            # Find peaks in Hough space (detected lines)
+            hspace_peaks = hough_line_peaks(hough_space, angles, dists, 
+                                          min_distance=20,   # Minimum distance between lines
+                                          threshold=0.3 * np.max(hough_space))  # Threshold for peak detection
+            
+            # Analyze detected lines
+            detected_lines = list(zip(*hspace_peaks))
+            
+            print(f"[RIBFINDER] Scikit-image Hough transform detected {len(detected_lines)} lines")
+            
+            # Group lines by orientation to identify distinct ribs
+            line_angles = [angle for _, angle, _ in detected_lines]
+            
+            # Group similar angles (within 10 degrees)
+            angle_groups = []
+            tolerance = np.pi / 18  # 10 degrees in radians
+            
+            for angle in line_angles:
+                # Normalize angle to [0, pi)
+                norm_angle = angle % np.pi
+                
+                # Find existing group or create new one
+                grouped = False
+                for group in angle_groups:
+                    group_angle = group[0]
+                    if abs(norm_angle - group_angle) < tolerance or abs(norm_angle - group_angle - np.pi) < tolerance:
+                        group.append(norm_angle)
+                        grouped = True
+                        break
+                
+                if not grouped:
+                    angle_groups.append([norm_angle])
+            
+            # Count distinct orientations (each represents a potential rib direction)
+            num_orientations = len(angle_groups)
+            
+            print(f"[RIBFINDER] Scikit-image found {num_orientations} distinct line orientations")
+            
+            # Advanced geometric analysis using contour detection
+            from skimage import measure
+            contours = measure.find_contours(cleaned_edges, level=0.5)
+            
+            # Analyze main contour structure
+            main_contour_length = 0
+            main_contour = None
+            
+            for contour in contours:
+                if len(contour) > main_contour_length:
+                    main_contour_length = len(contour)
+                    main_contour = contour
+            
+            # Analyze the main contour for corners/vertices
+            if main_contour is not None and len(main_contour) > 10:
+                # Simplify contour to find vertices
+                from skimage.measure import approximate_polygon
+                simplified = approximate_polygon(main_contour, tolerance=5)
+                vertices = len(simplified) - 1  # Subtract 1 because first and last point are the same
+                
+                print(f"[RIBFINDER] Scikit-image contour analysis: {vertices} vertices detected")
+                
+                # Use vertex count to determine ribs
+                if vertices >= 3:
+                    # For bent iron: vertices - 1 = ribs (approximately)
+                    # But we need to be smart about it
+                    if vertices == 3:  # Triangle-like = L-shape = 2 ribs
+                        contour_ribs = 2
+                    elif vertices == 4:  # Rectangle-like could be L-shape (2) or U-shape (3)
+                        # Use additional analysis
+                        # Check if it's more square (U-shape) or rectangular (L-shape)
+                        bbox = np.array([np.min(main_contour, axis=0), np.max(main_contour, axis=0)])
+                        width = bbox[1][1] - bbox[0][1]  # width
+                        height = bbox[1][0] - bbox[0][0]  # height
+                        aspect_ratio = max(width, height) / max(min(width, height), 1)
+                        
+                        if aspect_ratio < 2.5:  # More square-ish = U-shape
+                            contour_ribs = 3
+                        else:  # More rectangular = L-shape  
+                            contour_ribs = 2
+                    elif vertices == 5:  # Pentagon-like = U-shape = 3 ribs
+                        contour_ribs = 3
+                    else:
+                        contour_ribs = min(vertices - 1, 4)  # Cap at 4 ribs max
+                else:
+                    contour_ribs = 2  # Default fallback
+            else:
+                contour_ribs = 2  # Default fallback
+            
+            # Combine all methods for final decision
+            print(f"[RIBFINDER] Scikit-image analysis summary:")
+            print(f"  → Hough lines: {len(detected_lines)} detected")
+            print(f"  → Line orientations: {num_orientations}")  
+            print(f"  → Contour vertices: {vertices if 'vertices' in locals() else 'N/A'}")
+            print(f"  → Contour suggested ribs: {contour_ribs}")
+            
+            # Decision logic: combine multiple methods
+            method_votes = []
+            
+            # Vote from line orientations (each orientation suggests segments in that direction)
+            if num_orientations == 2:  # Two orientations = likely L-shape (2 ribs)
+                method_votes.append(2)
+            elif num_orientations >= 3:  # Three+ orientations = likely U-shape or more complex
+                method_votes.append(3)
+            else:
+                method_votes.append(2)  # Default to L-shape for single orientation
+            
+            # Vote from contour analysis
+            method_votes.append(contour_ribs)
+            
+            # Vote from number of detected lines
+            if len(detected_lines) <= 2:
+                method_votes.append(2)  # Few lines = L-shape
+            elif len(detected_lines) >= 3:
+                method_votes.append(3)  # More lines = U-shape
+            else:
+                method_votes.append(2)
+            
+            # Take majority vote or average
+            from collections import Counter
+            vote_counts = Counter(method_votes)
+            most_common_vote = vote_counts.most_common(1)[0][0]
+            
+            print(f"[RIBFINDER] Scikit-image method votes: {method_votes}")
+            print(f"[RIBFINDER] Scikit-image final decision: {most_common_vote} ribs")
+            
+            return most_common_vote
+                
+        except Exception as e:
+            print(f"[RIBFINDER] Scikit-image analysis failed: {e}")
+            return None
+    
     def count_ribs(self, image_path: str) -> Dict:
         """
         Count ribs in a bent iron drawing using both Google Vision and ChatGPT
@@ -261,6 +588,18 @@ class RibFinderAgent:
                 google_vision_count = self.analyze_with_google_vision(image_path)
                 if google_vision_count:
                     print(f"[RIBFINDER] Google Vision detected: {google_vision_count} ribs")
+            
+            # Try OpenCV vertex detection
+            print("[RIBFINDER] Using OpenCV vertex detection...")
+            opencv_count = self.analyze_with_opencv_vertices(image_path)
+            if opencv_count:
+                print(f"[RIBFINDER] OpenCV detected: {opencv_count} ribs")
+            
+            # Try Scikit-image line detection
+            print("[RIBFINDER] Using Scikit-image line detection...")
+            scikit_count = self.analyze_with_scikit_image(image_path)
+            if scikit_count:
+                print(f"[RIBFINDER] Scikit-image detected: {scikit_count} ribs")
             
             # Then use ChatGPT Vision
             print("[RIBFINDER] Using ChatGPT Vision (GPT-4o)...")
@@ -382,67 +721,66 @@ class RibFinderAgent:
             chatgpt_count = result.get("rib_count", 0)
             print(f"[RIBFINDER] ChatGPT detected: {chatgpt_count} ribs")
             
-            # Initialize Claude count
-            claude_count = None
             
-            # Check if Google Vision and ChatGPT disagree - if so, use Claude as tie-breaker
-            if google_vision_count is not None and google_vision_count != chatgpt_count:
-                print(f"[RIBFINDER] ⚠ DISAGREEMENT: Google={google_vision_count}, ChatGPT={chatgpt_count}")
-                
-                # Use Claude Vision as tie-breaker if available
-                if self.claude_client:
-                    print("[RIBFINDER] Using Claude Vision as tie-breaker...")
-                    claude_count = self.analyze_with_claude_vision(image_path)
-                    if claude_count:
-                        print(f"[RIBFINDER] Claude detected: {claude_count} ribs")
-                        
-                        # Determine final count based on agreement
-                        if claude_count == chatgpt_count:
-                            print(f"[RIBFINDER] ✓ RESOLUTION: Claude agrees with ChatGPT ({chatgpt_count} ribs)")
-                            result["rib_count"] = chatgpt_count
-                            match_percentage = 67  # 2 out of 3 agree
-                            result["vision_agreement"] = "MAJORITY_CHATGPT_CLAUDE"
-                        elif claude_count == google_vision_count:
-                            print(f"[RIBFINDER] ✓ RESOLUTION: Claude agrees with Google ({google_vision_count} ribs)")
-                            result["rib_count"] = google_vision_count
-                            match_percentage = 67  # 2 out of 3 agree
-                            result["vision_agreement"] = "MAJORITY_GOOGLE_CLAUDE"
-                        else:
-                            print(f"[RIBFINDER] ⚠ NO CONSENSUS: All three systems disagree!")
-                            print(f"  Google={google_vision_count}, ChatGPT={chatgpt_count}, Claude={claude_count}")
-                            # Use ChatGPT as default but with low confidence
-                            result["rib_count"] = chatgpt_count
-                            match_percentage = 33  # All disagree
-                            result["vision_agreement"] = "ALL_DISAGREE"
-                        
-                        # Store all counts for transparency
-                        result["google_vision_count"] = google_vision_count
-                        result["chatgpt_count"] = chatgpt_count
-                        result["claude_count"] = claude_count
-                    else:
-                        # Claude failed, stick with original disagreement
-                        match_percentage = 50
-                        result["vision_agreement"] = "DISAGREE_NO_TIEBREAKER"
-                        result["google_vision_count"] = google_vision_count
-                        result["chatgpt_count"] = chatgpt_count
-                else:
-                    # No Claude available for tie-breaking
-                    match_percentage = 50
-                    result["vision_agreement"] = "DISAGREE_NO_TIEBREAKER"
-                    result["google_vision_count"] = google_vision_count
-                    result["chatgpt_count"] = chatgpt_count
-                    
-            elif google_vision_count is not None and google_vision_count == chatgpt_count:
-                # Google and ChatGPT agree - perfect!
+            # Create list of available counts for analysis
+            counts = {}
+            if google_vision_count is not None:
+                counts['google'] = google_vision_count
+            if opencv_count is not None:
+                counts['opencv'] = opencv_count
+            if scikit_count is not None:
+                counts['scikit'] = scikit_count
+            counts['chatgpt'] = chatgpt_count
+            
+            # Claude Vision disabled by user request
+            
+            # Analyze agreement patterns among all available methods
+            method_names = list(counts.keys())
+            method_counts = list(counts.values())
+            
+            # Count how many methods agree on each value
+            from collections import Counter
+            count_frequency = Counter(method_counts)
+            most_common_count, frequency = count_frequency.most_common(1)[0]
+            
+            total_methods = len(method_counts)
+            agreement_percentage = (frequency / total_methods) * 100
+            
+            # Determine final result and confidence
+            result["rib_count"] = most_common_count
+            
+            if frequency == total_methods:
+                # Perfect agreement
                 match_percentage = 100
-                print(f"[RIBFINDER] ✓ AGREEMENT: Both systems detected {chatgpt_count} ribs (100% match)")
-                result["vision_agreement"] = "AGREE"
+                result["vision_agreement"] = "PERFECT_AGREEMENT"
+                print(f"[RIBFINDER] ✓ PERFECT AGREEMENT: All {total_methods} methods detected {most_common_count} ribs")
                 
-            elif google_vision_count is None:
-                # Only ChatGPT available
-                match_percentage = 75  # Single source confidence
-                print(f"[RIBFINDER] ChatGPT only: {chatgpt_count} ribs (75% - single source)")
-                result["vision_agreement"] = "SINGLE_SOURCE"
+            elif frequency >= (total_methods / 2):
+                # Majority agreement
+                match_percentage = int(agreement_percentage)
+                result["vision_agreement"] = "MAJORITY_AGREEMENT"
+                agreeing_methods = [method for method, count in counts.items() if count == most_common_count]
+                print(f"[RIBFINDER] ✓ MAJORITY AGREEMENT: {', '.join(agreeing_methods)} agree on {most_common_count} ribs ({match_percentage}%)")
+                
+            else:
+                # No clear majority - use ChatGPT as default
+                result["rib_count"] = chatgpt_count
+                match_percentage = 25  # Low confidence
+                result["vision_agreement"] = "NO_MAJORITY"
+                print(f"[RIBFINDER] ⚠ NO CLEAR MAJORITY: Using ChatGPT default ({chatgpt_count} ribs) with low confidence")
+                
+                # Show all disagreements
+                method_details = [f"{method}={count}" for method, count in counts.items()]
+                print(f"[RIBFINDER]   All results: {', '.join(method_details)}")
+            
+            # Store all counts for transparency
+            if google_vision_count is not None:
+                result["google_vision_count"] = google_vision_count
+            if opencv_count is not None:
+                result["opencv_count"] = opencv_count
+            if scikit_count is not None:
+                result["scikit_count"] = scikit_count
+            result["chatgpt_count"] = chatgpt_count
             
             # Add match percentage to result
             result["match_percentage"] = match_percentage

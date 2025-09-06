@@ -1,93 +1,109 @@
-[23:07:30] ================================================================================
-[23:07:30] 🦾 IRONMAN SYSTEM LOG - SESSION START: 2025-08-31 23:07:30
-[23:07:30] ================================================================================
-[23:07:30] 
+[23:24:50] ================================================================================
+[23:24:50] 🦾 IRONMAN SYSTEM LOG - SESSION START: 2025-09-02 23:24:50
+[23:24:50] ================================================================================
+[23:24:50] 
 [🦾 IRONMAN] System initializing...
-[23:07:30] [🦾 IRONMAN] Loading environment variables and API keys
-[23:07:31] [🦾 IRONMAN]   ✓ RIBFINDER (GPT-4o Rib Counter) created and ready
-[23:07:32] [🦾 IRONMAN]   ✓ CHATAN (Analysis Agent) created and ready
-[23:07:32] [🦾 IRONMAN]   ✓ CHATCO (Comparison Agent) created and ready
-[23:07:33] [🦾 IRONMAN]   ✓ PATHFINDER (Vector Path Agent) created and ready
-[23:07:33] [🦾 IRONMAN]   ✓ DATAOUTPUT (Database Agent) created and ready
-[23:07:33] 
+[23:24:50] [🦾 IRONMAN] Loading environment variables and API keys
+[23:24:50] [🦾 IRONMAN]   ✓ CLEANER (Drawing Cleaner) created and ready
+[23:24:50] [🦾 IRONMAN]   ✓ RIBFINDER (GPT-4o Rib Counter) created and ready
+[23:24:51] [🦾 IRONMAN]   ✓ CHATAN (Analysis Agent) created and ready
+[23:24:52] [🦾 IRONMAN]   ✓ CHATCO (Comparison Agent) created and ready
+[23:24:52] [🦾 IRONMAN]   ✓ PATHFINDER (Vector Path Agent) created and ready
+[23:24:52] [🦾 IRONMAN]   ✓ DATAOUTPUT (Database Agent) created and ready
+[23:24:52] 
 [🦾 IRONMAN] Scanning input directory...
-[23:07:33] [🦾 IRONMAN] Found 1 files to process:
-[23:07:33] [🦾 IRONMAN]   • Screenshot 2025-08-28 at 10.32.53 AM.png
-[23:07:33] 
+[23:24:52] [🦾 IRONMAN] Found 1 files to process:
+[23:24:52] [🦾 IRONMAN]   • Screenshot 2025-08-28 at 10.07.31 AM.png
+[23:24:52] 
 ============================================================
-[23:07:33] [🦾 IRONMAN] Processing file 1/1: Screenshot 2025-08-28 at 10.32.53 AM.png
-[23:07:33] ============================================================
-[23:07:33] 
-[🦾 IRONMAN] [STEP 2] Counting ribs with RIBFINDER
-[23:07:33] [🦾 IRONMAN]   → Sending to RIBFINDER
-[23:07:36] 
+[23:24:52] [🦾 IRONMAN] Processing file 1/1: Screenshot 2025-08-28 at 10.07.31 AM.png
+[23:24:52] ============================================================
+[23:24:52] 
+[🦾 IRONMAN] [STEP 2] Cleaning drawing with CLEANER
+[23:24:52] [🦾 IRONMAN]   → Sending to CLEANER
+[23:24:53] 
+[CLEANER] AGENT OUTPUT:
+[23:24:53] ----------------------------------------
+[23:24:53] [CLEANER] status: success
+[23:24:53] [CLEANER] original_path: io/input\Screenshot 2025-08-28 at 10.07.31 AM.png
+[23:24:53] [CLEANER] cleaned_path: io/cleaned\Screenshot 2025-08-28 at 10.07.31 AM_cleaned.png
+[23:24:53] [CLEANER] cleaning_method: phase2_enhanced
+[23:24:53] [CLEANER] pixels_removed: 10033
+[23:24:53] [CLEANER] cleaning_percentage: 56.88
+[23:24:53] [CLEANER] text_regions_detected: 3
+[23:24:53] [CLEANER] dimension_lines_detected: 15
+[23:24:53] [CLEANER] google_vision_used: True
+[23:24:53] [CLEANER] output_size: 1440
+[23:24:53] ----------------------------------------
+[23:24:53] 
+[🦾 IRONMAN] [STEP 3] Counting ribs with RIBFINDER
+[23:24:53] [🦾 IRONMAN]   → Sending to RIBFINDER
+[23:25:07] 
 [RIBFINDER] AGENT OUTPUT:
-[23:07:36] ----------------------------------------
-[23:07:36] [RIBFINDER] Rib Count: 3
-[23:07:36] [RIBFINDER] Match Percentage: 100%
-[23:07:36] ----------------------------------------
-[23:07:36] 
-[🦾 IRONMAN] [STEP 4] Sending request to CHATAN (Analysis Agent)
-[23:07:36] [🦾 IRONMAN]   → Sending to CHATAN
-[23:07:40] 
+[23:25:07] ----------------------------------------
+[23:25:07] [RIBFINDER] Rib Count: 2
+[23:25:07] [RIBFINDER] Match Percentage: 100%
+[23:25:07] [RIBFINDER] Vision Agreement: PERFECT_AGREEMENT
+[23:25:07] [RIBFINDER] ChatGPT Count: 2
+[23:25:07] [RIBFINDER] OpenCV Count: 2
+[23:25:07] [RIBFINDER] Scikit-image Count: 2
+[23:25:07] ----------------------------------------
+[23:25:07] 
+[🦾 IRONMAN] [STEP 5] Sending request to CHATAN (Analysis Agent)
+[23:25:07] [🦾 IRONMAN]   → Sending to CHATAN
+[23:25:12] 
 [CHATAN] AGENT OUTPUT:
-[23:07:40] ----------------------------------------
-[23:07:40] [CHATAN] Shape Type: U-shape
-[23:07:40] [CHATAN] Number of Ribs: 3
-[23:07:40] [CHATAN] Confidence: 100%
-[23:07:40] [CHATAN] Vision Match: 100%
-[23:07:40] [CHATAN] Vision Agreement: AGREE
-[23:07:40] [CHATAN] Sides Analysis:
-[23:07:40] [CHATAN]   Rib 1: 50 cm (left vertical leg)
-[23:07:40] [CHATAN]   Rib 2: 110 cm (horizontal base)
-[23:07:40] [CHATAN]   Rib 3: 50 cm (right vertical leg)
-[23:07:40] [CHATAN] Angles Between Ribs: [90, 90]°
-[23:07:40] [CHATAN] Google Vision Dimensions: [50, 110, 50]
-[23:07:40] [CHATAN] Status: Analysis with rib count complete
-[23:07:40] ----------------------------------------
-[23:07:40] 
+[23:25:12] ----------------------------------------
+[23:25:12] [CHATAN] Shape Type: L-shape
+[23:25:12] [CHATAN] Number of Ribs: 2
+[23:25:12] [CHATAN] Confidence: 100%
+[23:25:12] [CHATAN] Vision Match: 50%
+[23:25:12] [CHATAN] Vision Agreement: DISAGREE
+[23:25:12] [CHATAN] Sides Analysis:
+[23:25:12] [CHATAN]   Rib 1: 15 cm (left leg)
+[23:25:12] [CHATAN]   Rib 2: 387 cm (base)
+[23:25:12] [CHATAN]   Rib 3: 15 cm (right leg)
+[23:25:12] [CHATAN] Angles Between Ribs: [90, 90]°
+[23:25:12] [CHATAN] Google Vision Dimensions: [15, 387, 15]
+[23:25:12] [CHATAN] Status: Analysis with rib count complete
+[23:25:12] ----------------------------------------
+[23:25:12] 
 [🦾 IRONMAN] [STEP 5.5] Extracting vector path with PATHFINDER
-[23:07:40] [🦾 IRONMAN]   → Sending to PATHFINDER
-[23:07:42] 
+[23:25:12] [🦾 IRONMAN]   → Sending to PATHFINDER
+[23:25:16] 
 [PATHFINDER] AGENT OUTPUT:
-[23:07:42] ----------------------------------------
-[23:07:42] [PATHFINDER] Shape Type: U-shape
-[23:07:42] [PATHFINDER] Vertex Count: 4
-[23:07:42] [PATHFINDER] Total Path Length: 210.0 units
-[23:07:42] [PATHFINDER] Closed Shape: False
-[23:07:42] [PATHFINDER] Vector Analysis:
-[23:07:42] [PATHFINDER]   Vector 1: 50.0 units at -90.0°
-[23:07:42] [PATHFINDER]   Vector 2: 110.0 units at 0.0°
-[23:07:42] [PATHFINDER]   Vector 3: 50.0 units at 90.0°
-[23:07:42] [PATHFINDER] Bounding Box: 110.0 × 50.0 units
-[23:07:42] ----------------------------------------
-[23:07:42] 
+[23:25:16] ----------------------------------------
+[23:25:16] [PATHFINDER] Shape Type: L-shape
+[23:25:16] [PATHFINDER] Vertex Count: 4
+[23:25:16] [PATHFINDER] Total Path Length: 417.0 units
+[23:25:16] [PATHFINDER] Closed Shape: False
+[23:25:16] [PATHFINDER] Vector Analysis:
+[23:25:16] [PATHFINDER]   Vector 1: 15.0 units at 90.0°
+[23:25:16] [PATHFINDER]   Vector 2: 387.0 units at 0.0°
+[23:25:16] [PATHFINDER]   Vector 3: 15.0 units at -90.0°
+[23:25:16] [PATHFINDER] Bounding Box: 387.0 × 15.0 units
+[23:25:16] ----------------------------------------
+[23:25:16] 
 [🦾 IRONMAN] [STEP 6] Comparing with catalog shapes
-[23:07:42] [🦾 IRONMAN]   → Sending to CHATCO
-[23:07:50] 
+[23:25:16] [🦾 IRONMAN]   → Sending to CHATCO
+[23:25:24] 
 [CHATCO] AGENT OUTPUT:
-[23:07:50] ----------------------------------------
-[23:07:50] [CHATCO] Best Match File: shape 000.png
-[23:07:50] [CHATCO] Similarity Score: 40%
-[23:07:50] [CHATCO] Shape Match: NO
-[23:07:50] [CHATCO] Match Quality: POOR
-[23:07:50] [CHATCO] Differences: Input shape has 3 ribs, catalog shape has 1 rib
-[23:07:50] ----------------------------------------
-[23:07:50] [🦾 IRONMAN] ✓ Results validated successfully
-[23:07:50] 
+[23:25:24] ----------------------------------------
+[23:25:24] [CHATCO] Best Match File: shape 000.png
+[23:25:24] [CHATCO] Similarity Score: 40%
+[23:25:24] [CHATCO] Shape Match: NO
+[23:25:24] [CHATCO] Match Quality: POOR
+[23:25:24] [CHATCO] Differences: Input shape has 2 ribs, catalog shape has 1 rib
+[23:25:24] ----------------------------------------
+[23:25:24] [🦾 IRONMAN] ✓ Results validated successfully
+[23:25:24] 
 [🦾 IRONMAN] [STEP 7] Storing results in database
-[23:07:50] [🦾 IRONMAN]   → Sending to DATAOUTPUT
-[23:07:50] 
-[DATAOUTPUT] AGENT OUTPUT:
-[23:07:50] ----------------------------------------
-[23:07:50] [DATAOUTPUT] Status: SUCCESS
-[23:07:50] [DATAOUTPUT] Record ID: 82184ebd-813a-40a8-84a0-2e21acbda17c
-[23:07:50] [DATAOUTPUT] Order Number: ORD-20250831-001
-[23:07:50] ----------------------------------------
-[23:07:50] 
-[🦾 IRONMAN] File Screenshot 2025-08-28 at 10.32.53 AM.png: ✓ COMPLETED
-[23:07:50] 
+[23:25:24] [🦾 IRONMAN]   → Sending to DATAOUTPUT
+[23:25:24] [DATAOUTPUT] ERROR: Storage failed: Path degrees count (3) doesn't match rib count (2)
+[23:25:24] 
+[🦾 IRONMAN] File Screenshot 2025-08-28 at 10.07.31 AM.png: ✓ COMPLETED
+[23:25:24] 
 [🦾 IRONMAN] System workflow completed successfully
-[23:07:50] ================================================================================
-[23:07:50] 🦾 IRONMAN SYSTEM LOG - SESSION END: 2025-08-31 23:07:50
-[23:07:50] ================================================================================
+[23:25:24] ================================================================================
+[23:25:24] 🦾 IRONMAN SYSTEM LOG - SESSION END: 2025-09-02 23:25:24
+[23:25:24] ================================================================================

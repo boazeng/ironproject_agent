@@ -75,6 +75,19 @@ class IronManLogger:
         # Log different types of agent outputs
         if agent_name.upper() == "RIBFINDER":
             self._log_ribfinder_output(output_data)
+        elif agent_name.upper() == "RIBFINDER_CLEANED":
+            self._write_to_log("="*50)
+            self._write_to_log("[RIBFINDER] CLEANED IMAGE ANALYSIS:")
+            self._log_ribfinder_output(output_data)
+        elif agent_name.upper() == "RIBFINDER_ORIGINAL":
+            self._write_to_log("="*50)  
+            self._write_to_log("[RIBFINDER] ORIGINAL IMAGE ANALYSIS:")
+            self._log_ribfinder_output(output_data)
+        elif agent_name.upper() == "RIBFINDER_FINAL_CHOICE":
+            self._write_to_log("="*50)
+            self._write_to_log("[RIBFINDER] FINAL SELECTED RESULT:")
+            self._log_ribfinder_output(output_data)
+            self._write_to_log("="*50)
         elif agent_name.upper() == "CHATAN":
             self._log_chatan_output(output_data)
         elif agent_name.upper() == "PATHFINDER":
@@ -96,10 +109,16 @@ class IronManLogger:
             self._write_to_log(f"[RIBFINDER] Rib Count: {data['rib_count']}")
         if 'match_percentage' in data:
             self._write_to_log(f"[RIBFINDER] Match Percentage: {data['match_percentage']}%")
+        if 'vision_agreement' in data:
+            self._write_to_log(f"[RIBFINDER] Vision Agreement: {data['vision_agreement']}")
         if 'chatgpt_count' in data:
             self._write_to_log(f"[RIBFINDER] ChatGPT Count: {data['chatgpt_count']}")
         if 'google_vision_count' in data:
             self._write_to_log(f"[RIBFINDER] Google Vision Count: {data['google_vision_count']}")
+        if 'opencv_count' in data:
+            self._write_to_log(f"[RIBFINDER] OpenCV Count: {data['opencv_count']}")
+        if 'scikit_count' in data:
+            self._write_to_log(f"[RIBFINDER] Scikit-image Count: {data['scikit_count']}")
         if 'claude_count' in data:
             self._write_to_log(f"[RIBFINDER] Claude Count: {data['claude_count']}")
     
@@ -172,6 +191,26 @@ class IronManLogger:
             self._write_to_log(f"[CHATCO] Differences: {', '.join(data['differences'])}")
         if 'reasoning' in data and data['reasoning']:
             self._write_to_log(f"[CHATCO] Reasoning: {data['reasoning']}")
+    
+    def _log_cleaner_output(self, data: dict):
+        """Log CLEANER specific output."""
+        if 'status' in data:
+            self._write_to_log(f"[CLEANER] Status: {data['status'].upper()}")
+        if 'cleaned_path' in data:
+            self._write_to_log(f"[CLEANER] Cleaned Image: {data['cleaned_path']}")
+        if 'cleaning_method' in data:
+            self._write_to_log(f"[CLEANER] Cleaning Method: {data['cleaning_method']}")
+        if 'text_regions_detected' in data:
+            self._write_to_log(f"[CLEANER] Text Regions Detected: {data['text_regions_detected']}")
+        if 'dimension_lines_detected' in data:
+            self._write_to_log(f"[CLEANER] Dimension Lines Detected: {data['dimension_lines_detected']}")
+        if 'google_vision_used' in data:
+            vision_status = "Yes" if data['google_vision_used'] else "No (fallback used)"
+            self._write_to_log(f"[CLEANER] Google Vision Used: {vision_status}")
+        if 'pixels_removed' in data:
+            self._write_to_log(f"[CLEANER] Pixels Removed: {data['pixels_removed']:,}")
+        if 'cleaning_percentage' in data:
+            self._write_to_log(f"[CLEANER] Cleaning Percentage: {data['cleaning_percentage']}%")
     
     def _log_dataoutput_output(self, data: dict):
         """Log DataOutput specific output."""

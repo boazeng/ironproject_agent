@@ -2,6 +2,7 @@ import os
 import sys
 from dotenv import load_dotenv
 from agents.llm_agents import create_chatgpt_vision_agent, create_chatgpt_comparison_agent, create_rib_finder_agent, create_pathfinder_agent, create_dataoutput_agent
+from agents.llm_agents.cleaner_agent import CleanerAgent
 from utils.logger import IronManLogger
 
 # Set UTF-8 encoding for Windows
@@ -12,12 +13,13 @@ if sys.platform == "win32":
 # Load environment variables
 load_dotenv()
 
-def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder, logger):
+def process_drawing(file_path, cleaner, ribfinder, chat_analyse, chat_compare, pathfinder, logger):
     """
-    Process a bent iron drawing using RibFinder, CHATAN, CHATCO, and PATHFINDER
+    Process a bent iron drawing using CLEANER, RibFinder, CHATAN, CHATCO, and PATHFINDER
     
     Args:
         file_path: Path to the drawing file
+        cleaner: Cleaner agent instance (CLEANER)
         ribfinder: RibFinder agent instance (RIBFINDER)
         chat_analyse: ChatGPT vision agent instance (CHATAN) 
         chat_compare: ChatGPT comparison agent instance (CHATCO)
@@ -39,14 +41,42 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
         return {"error": f"File not found: {file_path}"}
     print(f"[🦾 IRONMAN]   ✓ File found at: {file_path}")
     
-    # Step 2: Count ribs with RibFinder
-    print("\n[🦾 IRONMAN] [STEP 2] Counting ribs with RIBFINDER...")
-    print("[🦾 IRONMAN]   → Sending to RIBFINDER (Premium Agent)")
+    # Step 2: Clean drawing with CLEANER
+    print("\n[🦾 IRONMAN] [STEP 2] Cleaning drawing with CLEANER...")
+    print("[🦾 IRONMAN]   → Sending to CLEANER (Drawing Cleaning Specialist)")
+    print("[🦾 IRONMAN]   → Removing text, numbers, and annotations...")
+    
+    logger.log_step_start(2, "Cleaning drawing with CLEANER", "CLEANER")
+    
+    cleaner_result = cleaner.clean_drawing(file_path)
+    
+    if "error" in cleaner_result:
+        print(f"[🦾 IRONMAN]   ⚠ CLEANER failed: {cleaner_result['error']}")
+        print("[🦾 IRONMAN]   → Using original image for analysis")
+        cleaned_image_path = file_path
+    else:
+        cleaned_image_path = cleaner_result["cleaned_path"]
+        print(f"[🦾 IRONMAN]   ✓ Drawing cleaned successfully")
+        print(f"[🦾 IRONMAN]   → Method: {cleaner_result.get('cleaning_method', 'unknown')}")
+        if cleaner_result.get('text_regions_detected'):
+            print(f"[🦾 IRONMAN]   → Text regions removed: {cleaner_result.get('text_regions_detected', 0)}")
+        if cleaner_result.get('dimension_lines_detected'):
+            print(f"[🦾 IRONMAN]   → Dimension lines removed: {cleaner_result.get('dimension_lines_detected', 0)}")
+        if 'google_vision_used' in cleaner_result:
+            vision_status = "Google Vision" if cleaner_result['google_vision_used'] else "OpenCV fallback"
+            print(f"[🦾 IRONMAN]   → Text detection: {vision_status}")
+        print(f"[🦾 IRONMAN]   → Cleaned image: {os.path.basename(cleaned_image_path)}")
+        
+        logger.log_agent_output("CLEANER", cleaner_result)
+    
+    # Step 3: Count ribs with RibFinder (using cleaned image)
+    print("\n[🦾 IRONMAN] [STEP 3] Counting ribs with RIBFINDER...")
+    print("[🦾 IRONMAN]   → Sending cleaned image to RIBFINDER (Premium Agent)")
     print("[🦾 IRONMAN]   → Using GPT-4o for maximum rib counting accuracy...")
     
-    logger.log_step_start(2, "Counting ribs with RIBFINDER", "RIBFINDER")
+    logger.log_step_start(3, "Counting ribs with RIBFINDER", "RIBFINDER")
     
-    rib_result = ribfinder.count_ribs(file_path)
+    rib_result = ribfinder.count_ribs(cleaned_image_path)
     
     if "error" in rib_result:
         print(f"[🦾 IRONMAN]   ❌ RIBFINDER Error: {rib_result['error']}")
@@ -63,19 +93,60 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     print(f"[🦾 IRONMAN]   → Confidence: {confidence}%")
     print(f"[🦾 IRONMAN]   → Vision Match: {match_percentage}% ({vision_agreement})")
     
+    # Check if match percentage is low and retry with original image if needed
+    if match_percentage < 50:
+        print(f"\n[🦾 IRONMAN] [STEP 3.1] Low match detected ({match_percentage}%) - Comparing with original image...")
+        print("[🦾 IRONMAN]   → Testing original image to see if cleaning affected accuracy")
+        
+        logger.log_step_start("3.1", "Comparing RIBFINDER results: cleaned vs original", "RIBFINDER")
+        
+        original_rib_result = ribfinder.count_ribs(file_path)
+        
+        if "error" not in original_rib_result:
+            original_match_percentage = original_rib_result.get("match_percentage", 0)
+            original_rib_count = original_rib_result.get("rib_count", 0)
+            original_vision_agreement = original_rib_result.get("vision_agreement", "UNKNOWN")
+            
+            print(f"[🦾 IRONMAN]   → Original image result: {original_rib_count} ribs")
+            print(f"[🦾 IRONMAN]   → Original match: {original_match_percentage}% ({original_vision_agreement})")
+            print(f"[🦾 IRONMAN]   → Cleaned match: {match_percentage}% ({vision_agreement})")
+            
+            # Log both results for comparison in log file
+            logger.log_agent_output("RIBFINDER_CLEANED", rib_result)
+            logger.log_agent_output("RIBFINDER_ORIGINAL", original_rib_result)
+            
+            # Use the result with higher match percentage
+            if original_match_percentage > match_percentage:
+                print(f"[🦾 IRONMAN]   ✓ Using original image result (better match: {original_match_percentage}% vs {match_percentage}%)")
+                rib_result = original_rib_result
+                rib_count = original_rib_count
+                match_percentage = original_match_percentage
+                vision_agreement = original_vision_agreement
+                shape_pattern = original_rib_result.get("shape_pattern", "unknown")
+                confidence = original_rib_result.get("confidence", 0)
+                
+                logger.log_agent_output("RIBFINDER_FINAL_CHOICE", original_rib_result)
+            else:
+                print(f"[🦾 IRONMAN]   → Keeping cleaned image result (cleaned: {match_percentage}% vs original: {original_match_percentage}%)")
+                logger.log_agent_output("RIBFINDER_FINAL_CHOICE", rib_result)
+        else:
+            print(f"[🦾 IRONMAN]   ⚠ Original image analysis failed: {original_rib_result['error']}")
+    else:
+        print(f"[🦾 IRONMAN]   ✓ Good match percentage ({match_percentage}%) - no retry needed")
+    
     logger.log_agent_output("RIBFINDER", rib_result)
     
-    # Step 3: Prepare for detailed analysis  
-    print("\n[🦾 IRONMAN] [STEP 3] Preparing detailed analysis request...")
+    # Step 4: Prepare for detailed analysis  
+    print("\n[🦾 IRONMAN] [STEP 4] Preparing detailed analysis request...")
     print(f"[🦾 IRONMAN]   ✓ File size: {os.path.getsize(file_path) / 1024:.2f} KB")
     print(f"[🦾 IRONMAN]   ✓ Rib count established: {rib_count} ribs")
     
-    # Step 4: Send to CHATAN (Chat Analyse Agent) with rib count info
-    print("\n[🦾 IRONMAN] [STEP 4] Sending request to CHATAN (Analysis Agent)...")
+    # Step 5: Send to CHATAN (Chat Analyse Agent) with rib count info
+    print("\n[🦾 IRONMAN] [STEP 5] Sending request to CHATAN (Analysis Agent)...")
     print(f"[🦾 IRONMAN]   → Transferring image to CHATAN with established rib count: {rib_count}")
     print(f"[🦾 IRONMAN]   → CHATAN will use RIBFINDER's accurate count ({rib_count} ribs)")
     
-    logger.log_step_start(4, "Sending request to CHATAN (Analysis Agent)", "CHATAN")
+    logger.log_step_start(5, "Sending request to CHATAN (Analysis Agent)", "CHATAN")
     
     # Use dual vision analysis for CHATAN with RIBFINDER's established rib count
     result = chat_analyse.analyze_with_rib_count(file_path, rib_result)
@@ -88,8 +159,8 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     result["ribfinder"] = rib_result
     result["expected_rib_count"] = rib_count
     
-    # Step 5: Process and display results
-    print("\n[🦾 IRONMAN] [STEP 5] Processing analysis results...")
+    # Step 6: Process and display results
+    print("\n[🦾 IRONMAN] [STEP 6] Processing analysis results...")
     print("-"*60)
     print("[🦾 IRONMAN] ANALYSIS RESULTS:")
     print("-"*60)
@@ -143,7 +214,7 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     
     # If dimensions are missing, ask CHATAN to reanalyze
     if missing_dimensions:
-        print(f"\n[🦾 IRONMAN] [STEP 3.1] Requesting CHATAN to search for missing dimensions...")
+        print(f"\n[🦾 IRONMAN] [STEP 5.1] Requesting CHATAN to search for missing dimensions...")
         print(f"[🦾 IRONMAN]   → CHATAN, please look more carefully for ALL dimensions")
         print(f"[🦾 IRONMAN]   → Focus on finding the {missing_desc} dimension")
         
@@ -187,7 +258,7 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
         print("-"*60)
     
     # Step 5.5: Extract vector path using PATHFINDER
-    print("\n[🦾 IRONMAN] [STEP 5.5] Extracting vector path with PATHFINDER...")
+    print("\n[🦾 IRONMAN] [STEP 6.5] Extracting vector path with PATHFINDER...")
     print(f"[🦾 IRONMAN]   → Sending to PATHFINDER (Vector Path Extraction)")
     print(f"[🦾 IRONMAN]   → Using established rib count: {rib_count} ribs")
     
@@ -237,7 +308,7 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
     print("-"*60)
     
     # Step 6: Compare with catalog shapes using CHATCO
-    print("\n[🦾 IRONMAN] [STEP 6] Comparing with catalog shapes...")
+    print("\n[🦾 IRONMAN] [STEP 7] Comparing with catalog shapes...")
     print("[🦾 IRONMAN]   → Sending to CHATCO (Comparison Agent)")
     print("[🦾 IRONMAN]   → CHATCO analyzing similarity with catalog...")
     
@@ -281,7 +352,7 @@ def process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder
         print(f"[🦾 IRONMAN]   → Asking CHATCO to recheck with correct rib count...")
         
         # Ask CHATCO to reanalyze with the correct rib count
-        print(f"[🦾 IRONMAN] [STEP 6.1] CHATCO recheck with established {ribfinder_count} ribs...")
+        print(f"[🦾 IRONMAN] [STEP 7.1] CHATCO recheck with established {ribfinder_count} ribs...")
         comparison_result = chat_compare.compare_with_analysis_corrected(file_path, result, "io/catalog", ribfinder_count)
     
     if comparison_result.get("best_match"):
@@ -396,7 +467,7 @@ def reprocess_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfind
     Returns:
         Dictionary with new analysis results
     """
-    print(f"\n[🦾 IRONMAN] [STEP 3.{attempt_number}] Re-sending request to CHATAN...")
+    print(f"\n[🦾 IRONMAN] [STEP 5.{attempt_number}] Re-sending request to CHATAN...")
     print("[🦾 IRONMAN]   → Asking CHATAN to double-check previous analysis")
     print("[🦾 IRONMAN]   → Requesting more careful examination from CHATAN")
     
@@ -472,6 +543,12 @@ def main():
     
     # Initialize ChatGPT Agents with their nicknames
     print("\n[🦾 IRONMAN] Creating sub-agents...")
+    
+    print("[🦾 IRONMAN]   → Initializing CLEANER (Drawing Cleaning Specialist)...")
+    cleaner = CleanerAgent()  # CLEANER
+    print("[🦾 IRONMAN]   ✓ CLEANER (Drawing Cleaner) created and ready")
+    logger.log_agent_creation("CLEANER", "Drawing Cleaner")
+    
     print("[🦾 IRONMAN]   → Initializing RIBFINDER (Premium Rib Counter)...")
     ribfinder = create_rib_finder_agent(api_key)  # RIBFINDER
     print("[🦾 IRONMAN]   ✓ RIBFINDER (GPT-4o Rib Counter) created and ready")
@@ -537,7 +614,7 @@ def main():
         logger.log_file_processing_start(file, i, len(files))
         
         # Initial analysis with RibFinder first
-        result = process_drawing(file_path, ribfinder, chat_analyse, chat_compare, pathfinder, logger)
+        result = process_drawing(file_path, cleaner, ribfinder, chat_analyse, chat_compare, pathfinder, logger)
         
         # Validate results with user
         print(f"\n[🦾 IRONMAN] Requesting user validation for file {i}/{len(files)}")
@@ -556,7 +633,7 @@ def main():
                 logger.log_validation_result(True)
                 
                 # Store results in database using DATAOUTPUT agent
-                print(f"\n[🦾 IRONMAN] [STEP 7] Storing results in database...")
+                print(f"\n[🦾 IRONMAN] [STEP 8] Storing results in database...")
                 print("[🦾 IRONMAN]   → Sending to DATAOUTPUT (Database Storage)")
                 
                 logger.log_step_start(7, "Storing results in database", "DATAOUTPUT")
