@@ -1,109 +1,46 @@
-[23:24:50] ================================================================================
-[23:24:50] 🦾 IRONMAN SYSTEM LOG - SESSION START: 2025-09-02 23:24:50
-[23:24:50] ================================================================================
-[23:24:50] 
+[21:17:21] ================================================================================
+[21:17:21] 🦾 IRONMAN SYSTEM LOG - SESSION START: 2025-09-12 21:17:21
+[21:17:21] ================================================================================
+[21:17:21] 
 [🦾 IRONMAN] System initializing...
-[23:24:50] [🦾 IRONMAN] Loading environment variables and API keys
-[23:24:50] [🦾 IRONMAN]   ✓ CLEANER (Drawing Cleaner) created and ready
-[23:24:50] [🦾 IRONMAN]   ✓ RIBFINDER (GPT-4o Rib Counter) created and ready
-[23:24:51] [🦾 IRONMAN]   ✓ CHATAN (Analysis Agent) created and ready
-[23:24:52] [🦾 IRONMAN]   ✓ CHATCO (Comparison Agent) created and ready
-[23:24:52] [🦾 IRONMAN]   ✓ PATHFINDER (Vector Path Agent) created and ready
-[23:24:52] [🦾 IRONMAN]   ✓ DATAOUTPUT (Database Agent) created and ready
-[23:24:52] 
+[21:17:21] [🦾 IRONMAN] Loading environment variables and API keys
+[21:17:21] [🦾 IRONMAN]   ✓ GLOBAL (Full Order Document Analyzer) created and ready
+[21:17:21] 
 [🦾 IRONMAN] Scanning input directory...
-[23:24:52] [🦾 IRONMAN] Found 1 files to process:
-[23:24:52] [🦾 IRONMAN]   • Screenshot 2025-08-28 at 10.07.31 AM.png
-[23:24:52] 
+[21:17:21] [🦾 IRONMAN] Found 2 files to process:
+[21:17:21] [🦾 IRONMAN]   • CO25S006348.pdf
+[21:17:21] [🦾 IRONMAN]   • CO25S006348_temp_header_extract.png
+[21:17:21] 
 ============================================================
-[23:24:52] [🦾 IRONMAN] Processing file 1/1: Screenshot 2025-08-28 at 10.07.31 AM.png
-[23:24:52] ============================================================
-[23:24:52] 
-[🦾 IRONMAN] [STEP 2] Cleaning drawing with CLEANER
-[23:24:52] [🦾 IRONMAN]   → Sending to CLEANER
-[23:24:53] 
-[CLEANER] AGENT OUTPUT:
-[23:24:53] ----------------------------------------
-[23:24:53] [CLEANER] status: success
-[23:24:53] [CLEANER] original_path: io/input\Screenshot 2025-08-28 at 10.07.31 AM.png
-[23:24:53] [CLEANER] cleaned_path: io/cleaned\Screenshot 2025-08-28 at 10.07.31 AM_cleaned.png
-[23:24:53] [CLEANER] cleaning_method: phase2_enhanced
-[23:24:53] [CLEANER] pixels_removed: 10033
-[23:24:53] [CLEANER] cleaning_percentage: 56.88
-[23:24:53] [CLEANER] text_regions_detected: 3
-[23:24:53] [CLEANER] dimension_lines_detected: 15
-[23:24:53] [CLEANER] google_vision_used: True
-[23:24:53] [CLEANER] output_size: 1440
-[23:24:53] ----------------------------------------
-[23:24:53] 
-[🦾 IRONMAN] [STEP 3] Counting ribs with RIBFINDER
-[23:24:53] [🦾 IRONMAN]   → Sending to RIBFINDER
-[23:25:07] 
-[RIBFINDER] AGENT OUTPUT:
-[23:25:07] ----------------------------------------
-[23:25:07] [RIBFINDER] Rib Count: 2
-[23:25:07] [RIBFINDER] Match Percentage: 100%
-[23:25:07] [RIBFINDER] Vision Agreement: PERFECT_AGREEMENT
-[23:25:07] [RIBFINDER] ChatGPT Count: 2
-[23:25:07] [RIBFINDER] OpenCV Count: 2
-[23:25:07] [RIBFINDER] Scikit-image Count: 2
-[23:25:07] ----------------------------------------
-[23:25:07] 
-[🦾 IRONMAN] [STEP 5] Sending request to CHATAN (Analysis Agent)
-[23:25:07] [🦾 IRONMAN]   → Sending to CHATAN
-[23:25:12] 
-[CHATAN] AGENT OUTPUT:
-[23:25:12] ----------------------------------------
-[23:25:12] [CHATAN] Shape Type: L-shape
-[23:25:12] [CHATAN] Number of Ribs: 2
-[23:25:12] [CHATAN] Confidence: 100%
-[23:25:12] [CHATAN] Vision Match: 50%
-[23:25:12] [CHATAN] Vision Agreement: DISAGREE
-[23:25:12] [CHATAN] Sides Analysis:
-[23:25:12] [CHATAN]   Rib 1: 15 cm (left leg)
-[23:25:12] [CHATAN]   Rib 2: 387 cm (base)
-[23:25:12] [CHATAN]   Rib 3: 15 cm (right leg)
-[23:25:12] [CHATAN] Angles Between Ribs: [90, 90]°
-[23:25:12] [CHATAN] Google Vision Dimensions: [15, 387, 15]
-[23:25:12] [CHATAN] Status: Analysis with rib count complete
-[23:25:12] ----------------------------------------
-[23:25:12] 
-[🦾 IRONMAN] [STEP 5.5] Extracting vector path with PATHFINDER
-[23:25:12] [🦾 IRONMAN]   → Sending to PATHFINDER
-[23:25:16] 
-[PATHFINDER] AGENT OUTPUT:
-[23:25:16] ----------------------------------------
-[23:25:16] [PATHFINDER] Shape Type: L-shape
-[23:25:16] [PATHFINDER] Vertex Count: 4
-[23:25:16] [PATHFINDER] Total Path Length: 417.0 units
-[23:25:16] [PATHFINDER] Closed Shape: False
-[23:25:16] [PATHFINDER] Vector Analysis:
-[23:25:16] [PATHFINDER]   Vector 1: 15.0 units at 90.0°
-[23:25:16] [PATHFINDER]   Vector 2: 387.0 units at 0.0°
-[23:25:16] [PATHFINDER]   Vector 3: 15.0 units at -90.0°
-[23:25:16] [PATHFINDER] Bounding Box: 387.0 × 15.0 units
-[23:25:16] ----------------------------------------
-[23:25:16] 
-[🦾 IRONMAN] [STEP 6] Comparing with catalog shapes
-[23:25:16] [🦾 IRONMAN]   → Sending to CHATCO
-[23:25:24] 
-[CHATCO] AGENT OUTPUT:
-[23:25:24] ----------------------------------------
-[23:25:24] [CHATCO] Best Match File: shape 000.png
-[23:25:24] [CHATCO] Similarity Score: 40%
-[23:25:24] [CHATCO] Shape Match: NO
-[23:25:24] [CHATCO] Match Quality: POOR
-[23:25:24] [CHATCO] Differences: Input shape has 2 ribs, catalog shape has 1 rib
-[23:25:24] ----------------------------------------
-[23:25:24] [🦾 IRONMAN] ✓ Results validated successfully
-[23:25:24] 
-[🦾 IRONMAN] [STEP 7] Storing results in database
-[23:25:24] [🦾 IRONMAN]   → Sending to DATAOUTPUT
-[23:25:24] [DATAOUTPUT] ERROR: Storage failed: Path degrees count (3) doesn't match rib count (2)
-[23:25:24] 
-[🦾 IRONMAN] File Screenshot 2025-08-28 at 10.07.31 AM.png: ✓ COMPLETED
-[23:25:24] 
+[21:17:21] [🦾 IRONMAN] Processing file 1/2: CO25S006348.pdf
+[21:17:21] ============================================================
+[21:17:21] 
+[🦾 IRONMAN] [STEP 2] Analyzing order document with GLOBAL
+[21:17:21] [🦾 IRONMAN]   → Sending to GLOBAL
+[21:17:49] 
+[GLOBAL] AGENT OUTPUT:
+[21:17:49] ----------------------------------------
+[21:17:49] [GLOBAL] file: CO25S006348.pdf
+[21:17:49] [GLOBAL] file_type: pdf
+[21:17:49] [GLOBAL] sections: {'header': {'found': True, 'location': 'top', 'company_name': '', 'order_number': '2800', 'date': '', 'customer': 'גל אריאל - מזרחי ודרמונה', 'header_table': {'found': True, 'rows': 2, 'key_values': [{'לקוח / פרויקט': 'גל אריאל - מזרחי ודרמונה'}, {'איש הקשר באתר': 'דניאל אונגרין'}, {'טלפון': '508932525'}, {'מספר הזמנה': '2800'}, {'משקל כולל': '4,183 Kg'}]}}, 'main_table': {'found': True, 'location': 'middle', 'row_count': 6, 'columns': ["מס'", 'תיאור', 'קוטר [mm]', 'אורך [m]', 'סל"ד \'ח\'', 'סל"ד \'ח\'', 'סה"כ משקל [kg]'], 'contains_iron_orders': True, 'all_items': [{"מס'": '1', 'תיאור': 'ב.ע', 'קוטר [mm]': '12', 'אורך [m]': '1.5', 'סל"ד \'ח\'': '18', 'סה"כ משקל [kg]': '24.0'}, {"מס'": '2', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '5', 'סל"ד \'ח\'': '4', 'סה"כ משקל [kg]': '17.8'}, {"מס'": '3', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '2', 'סל"ד \'ח\'': '72', 'סה"כ משקל [kg]': '127.9'}, {"מס'": '4', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '4', 'סל"ד \'ח\'': '68', 'סה"כ משקל [kg]': '241.5'}, {"מס'": '5', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '4.5', 'סל"ד \'ח\'': '17', 'סה"כ משקל [kg]': '67.9'}, {"מס'": '6', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '6', 'סל"ד \'ח\'': '38', 'סה"כ משקל [kg]': '202.5'}]}, 'footer': {'found': False, 'location': 'bottom', 'total_amount': '', 'terms': '', 'signatures': False, 'contact_info': ''}}
+[21:17:49] [GLOBAL] ocr_data: {'error': 'Google Vision not initialized', 'text': '', 'blocks': []}
+[21:17:49] [GLOBAL] analysis: {'document_type': 'order_page', 'language': 'mixed', 'sections': {'header': {'found': True, 'location': 'top', 'company_name': '', 'order_number': '2800', 'date': '', 'customer': 'גל אריאל - מזרחי ודרמונה', 'header_table': {'found': True, 'rows': 2, 'key_values': [{'לקוח / פרויקט': 'גל אריאל - מזרחי ודרמונה'}, {'איש הקשר באתר': 'דניאל אונגרין'}, {'טלפון': '508932525'}, {'מספר הזמנה': '2800'}, {'משקל כולל': '4,183 Kg'}]}}, 'main_table': {'found': True, 'location': 'middle', 'row_count': 6, 'columns': ["מס'", 'תיאור', 'קוטר [mm]', 'אורך [m]', 'סל"ד \'ח\'', 'סל"ד \'ח\'', 'סה"כ משקל [kg]'], 'contains_iron_orders': True, 'all_items': [{"מס'": '1', 'תיאור': 'ב.ע', 'קוטר [mm]': '12', 'אורך [m]': '1.5', 'סל"ד \'ח\'': '18', 'סה"כ משקל [kg]': '24.0'}, {"מס'": '2', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '5', 'סל"ד \'ח\'': '4', 'סה"כ משקל [kg]': '17.8'}, {"מס'": '3', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '2', 'סל"ד \'ח\'': '72', 'סה"כ משקל [kg]': '127.9'}, {"מס'": '4', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '4', 'סל"ד \'ח\'': '68', 'סה"כ משקל [kg]': '241.5'}, {"מס'": '5', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '4.5', 'סל"ד \'ח\'': '17', 'סה"כ משקל [kg]': '67.9'}, {"מס'": '6', 'תיאור': '', 'קוטר [mm]': '12', 'אורך [m]': '6', 'סל"ד \'ח\'': '38', 'סה"כ משקל [kg]': '202.5'}]}, 'footer': {'found': False, 'location': 'bottom', 'total_amount': '', 'terms': '', 'signatures': False, 'contact_info': ''}}, 'summary': 'This document is an order page containing customer details, order number, and a main table listing items with specifications such as diameter, length, and weight. The text is primarily in Hebrew with some English.'}
+[21:17:49] [GLOBAL] pdf_pages: 4
+[21:17:49] [GLOBAL] analyzing_page: 1
+[21:17:49] [GLOBAL] table_image_path: io\fullorder_output\table_detection\CO25S006348_main_table.png
+[21:17:49] [GLOBAL] table_header_image_path: io\fullorder_output\table_detection\CO25S006348_table_header.png
+[21:17:49] ----------------------------------------
+[21:17:49] 
+[🦾 IRONMAN] File CO25S006348.pdf: ✓ COMPLETED
+[21:17:49] 
+============================================================
+[21:17:49] [🦾 IRONMAN] Processing file 2/2: CO25S006348_temp_header_extract.png
+[21:17:49] ============================================================
+[21:17:49] [GLOBAL] ERROR: File not found: io/fullorder\CO25S006348_temp_header_extract.png
+[21:17:49] 
+[🦾 IRONMAN] File CO25S006348_temp_header_extract.png: ✗ FAILED
+[21:17:49] 
 [🦾 IRONMAN] System workflow completed successfully
-[23:25:24] ================================================================================
-[23:25:24] 🦾 IRONMAN SYSTEM LOG - SESSION END: 2025-09-02 23:25:24
-[23:25:24] ================================================================================
+[21:17:49] ================================================================================
+[21:17:49] 🦾 IRONMAN SYSTEM LOG - SESSION END: 2025-09-12 21:17:49
+[21:17:49] ================================================================================

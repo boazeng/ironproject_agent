@@ -1,0 +1,226 @@
+{
+  "file": "CO25S006348.pdf",
+  "file_type": "pdf",
+  "sections": {
+    "header": {
+      "found": true,
+      "location": "top",
+      "company_name": "",
+      "order_number": "2800",
+      "date": "",
+      "customer": "גל אריאל - מזרחי ודרמונה",
+      "header_table": {
+        "found": true,
+        "rows": 2,
+        "key_values": [
+          {
+            "לקוח / פרויקט": "גל אריאל - מזרחי ודרמונה"
+          },
+          {
+            "איש הקשר באתר": "דניאל אונגרין"
+          },
+          {
+            "טלפון": "508932525"
+          },
+          {
+            "מספר הזמנה": "2800"
+          },
+          {
+            "משקל כולל": "4,183 Kg"
+          }
+        ]
+      }
+    },
+    "main_table": {
+      "found": true,
+      "location": "middle",
+      "row_count": 6,
+      "columns": [
+        "מס'",
+        "תיאור",
+        "קוטר [mm]",
+        "אורך [m]",
+        "סל\"ד 'ח'",
+        "סל\"ד 'ח'",
+        "סה\"כ משקל [kg]"
+      ],
+      "contains_iron_orders": true,
+      "all_items": [
+        {
+          "מס'": "1",
+          "תיאור": "ב.ע",
+          "קוטר [mm]": "12",
+          "אורך [m]": "1.5",
+          "סל\"ד 'ח'": "18",
+          "סה\"כ משקל [kg]": "24.0"
+        },
+        {
+          "מס'": "2",
+          "תיאור": "",
+          "קוטר [mm]": "12",
+          "אורך [m]": "5",
+          "סל\"ד 'ח'": "4",
+          "סה\"כ משקל [kg]": "17.8"
+        },
+        {
+          "מס'": "3",
+          "תיאור": "",
+          "קוטר [mm]": "12",
+          "אורך [m]": "2",
+          "סל\"ד 'ח'": "72",
+          "סה\"כ משקל [kg]": "127.9"
+        },
+        {
+          "מס'": "4",
+          "תיאור": "",
+          "קוטר [mm]": "12",
+          "אורך [m]": "4",
+          "סל\"ד 'ח'": "68",
+          "סה\"כ משקל [kg]": "241.5"
+        },
+        {
+          "מס'": "5",
+          "תיאור": "",
+          "קוטר [mm]": "12",
+          "אורך [m]": "4.5",
+          "סל\"ד 'ח'": "17",
+          "סה\"כ משקל [kg]": "67.9"
+        },
+        {
+          "מס'": "6",
+          "תיאור": "",
+          "קוטר [mm]": "12",
+          "אורך [m]": "6",
+          "סל\"ד 'ח'": "38",
+          "סה\"כ משקל [kg]": "202.5"
+        }
+      ]
+    },
+    "footer": {
+      "found": false,
+      "location": "bottom",
+      "total_amount": "",
+      "terms": "",
+      "signatures": false,
+      "contact_info": ""
+    }
+  },
+  "ocr_data": {
+    "error": "Google Vision not initialized",
+    "text": "",
+    "blocks": []
+  },
+  "analysis": {
+    "document_type": "order_page",
+    "language": "mixed",
+    "sections": {
+      "header": {
+        "found": true,
+        "location": "top",
+        "company_name": "",
+        "order_number": "2800",
+        "date": "",
+        "customer": "גל אריאל - מזרחי ודרמונה",
+        "header_table": {
+          "found": true,
+          "rows": 2,
+          "key_values": [
+            {
+              "לקוח / פרויקט": "גל אריאל - מזרחי ודרמונה"
+            },
+            {
+              "איש הקשר באתר": "דניאל אונגרין"
+            },
+            {
+              "טלפון": "508932525"
+            },
+            {
+              "מספר הזמנה": "2800"
+            },
+            {
+              "משקל כולל": "4,183 Kg"
+            }
+          ]
+        }
+      },
+      "main_table": {
+        "found": true,
+        "location": "middle",
+        "row_count": 6,
+        "columns": [
+          "מס'",
+          "תיאור",
+          "קוטר [mm]",
+          "אורך [m]",
+          "סל\"ד 'ח'",
+          "סל\"ד 'ח'",
+          "סה\"כ משקל [kg]"
+        ],
+        "contains_iron_orders": true,
+        "all_items": [
+          {
+            "מס'": "1",
+            "תיאור": "ב.ע",
+            "קוטר [mm]": "12",
+            "אורך [m]": "1.5",
+            "סל\"ד 'ח'": "18",
+            "סה\"כ משקל [kg]": "24.0"
+          },
+          {
+            "מס'": "2",
+            "תיאור": "",
+            "קוטר [mm]": "12",
+            "אורך [m]": "5",
+            "סל\"ד 'ח'": "4",
+            "סה\"כ משקל [kg]": "17.8"
+          },
+          {
+            "מס'": "3",
+            "תיאור": "",
+            "קוטר [mm]": "12",
+            "אורך [m]": "2",
+            "סל\"ד 'ח'": "72",
+            "סה\"כ משקל [kg]": "127.9"
+          },
+          {
+            "מס'": "4",
+            "תיאור": "",
+            "קוטר [mm]": "12",
+            "אורך [m]": "4",
+            "סל\"ד 'ח'": "68",
+            "סה\"כ משקל [kg]": "241.5"
+          },
+          {
+            "מס'": "5",
+            "תיאור": "",
+            "קוטר [mm]": "12",
+            "אורך [m]": "4.5",
+            "סל\"ד 'ח'": "17",
+            "סה\"כ משקל [kg]": "67.9"
+          },
+          {
+            "מס'": "6",
+            "תיאור": "",
+            "קוטר [mm]": "12",
+            "אורך [m]": "6",
+            "סל\"ד 'ח'": "38",
+            "סה\"כ משקל [kg]": "202.5"
+          }
+        ]
+      },
+      "footer": {
+        "found": false,
+        "location": "bottom",
+        "total_amount": "",
+        "terms": "",
+        "signatures": false,
+        "contact_info": ""
+      }
+    },
+    "summary": "This document is an order page containing customer details, order number, and a main table listing items with specifications such as diameter, length, and weight. The text is primarily in Hebrew with some English."
+  },
+  "pdf_pages": 4,
+  "analyzing_page": 1,
+  "table_image_path": "io\\fullorder_output\\table_detection\\CO25S006348_main_table.png",
+  "table_header_image_path": "io\\fullorder_output\\table_detection\\CO25S006348_table_header.png"
+}

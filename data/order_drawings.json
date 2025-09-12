@@ -2,8 +2,8 @@
   "metadata": {
     "created": "2025-08-31T22:08:58.014724",
     "description": "Iron order drawing analysis results",
-    "total_records": 38,
-    "last_updated": "2025-09-02T23:23:33.947291"
+    "total_records": 39,
+    "last_updated": "2025-09-12T18:06:45.495487"
   },
   "drawings": [
     {
@@ -1834,6 +1834,58 @@
         "is_compatible": false,
         "differences": [
           "Input shape has 3 ribs; catalog shape has 1 rib"
+        ]
+      }
+    },
+    {
+      "id": "11b1786a-187a-48e6-8ade-44f0915ffdb5",
+      "order_number": "ORD-20250912-001",
+      "file_name": "Screenshot 2025-08-28 at 10.07.31 AM.png",
+      "date": "2025-09-12T18:06:45.493427",
+      "number_of_ribs": 3,
+      "straight_rib": true,
+      "shape_explanation": "d. U rib with different side rib length with rotation",
+      "path_degrees": [
+        {
+          "rib_number": 1,
+          "length": 15,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 2,
+          "length": 387,
+          "degree_to_next": 90
+        },
+        {
+          "rib_number": 3,
+          "length": 15,
+          "degree_to_next": null
+        }
+      ],
+      "path_vectors": [
+        {
+          "rib_number": 1,
+          "dx": 0,
+          "dy": 15
+        },
+        {
+          "rib_number": 2,
+          "dx": 387,
+          "dy": 0
+        },
+        {
+          "rib_number": 3,
+          "dx": 0,
+          "dy": -15
+        }
+      ],
+      "compatible_catalog_shape": {
+        "best_match_file": "shape 000.png",
+        "similarity_score": 40,
+        "match_quality": "POOR",
+        "is_compatible": false,
+        "differences": [
+          "Input shape has 3 ribs, catalog shape has 1 rib"
         ]
       }
     }

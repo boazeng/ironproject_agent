@@ -41,42 +41,23 @@ def process_drawing(file_path, cleaner, ribfinder, chat_analyse, chat_compare, p
         return {"error": f"File not found: {file_path}"}
     print(f"[🦾 IRONMAN]   ✓ File found at: {file_path}")
     
-    # Step 2: Clean drawing with CLEANER
-    print("\n[🦾 IRONMAN] [STEP 2] Cleaning drawing with CLEANER...")
-    print("[🦾 IRONMAN]   → Sending to CLEANER (Drawing Cleaning Specialist)")
-    print("[🦾 IRONMAN]   → Removing text, numbers, and annotations...")
+    # Step 2: SKIPPING CLEANER - Using original drawing directly
+    print("\n[🦾 IRONMAN] [STEP 2] SKIPPING CLEANER - Using original drawing")
+    print("[🦾 IRONMAN]   → Bypassing CLEANER agent as requested")
+    print("[🦾 IRONMAN]   → Will send original drawing directly to RIBFINDER")
     
-    logger.log_step_start(2, "Cleaning drawing with CLEANER", "CLEANER")
+    # Use original image path instead of cleaned image
+    cleaned_image_path = file_path
     
-    cleaner_result = cleaner.clean_drawing(file_path)
-    
-    if "error" in cleaner_result:
-        print(f"[🦾 IRONMAN]   ⚠ CLEANER failed: {cleaner_result['error']}")
-        print("[🦾 IRONMAN]   → Using original image for analysis")
-        cleaned_image_path = file_path
-    else:
-        cleaned_image_path = cleaner_result["cleaned_path"]
-        print(f"[🦾 IRONMAN]   ✓ Drawing cleaned successfully")
-        print(f"[🦾 IRONMAN]   → Method: {cleaner_result.get('cleaning_method', 'unknown')}")
-        if cleaner_result.get('text_regions_detected'):
-            print(f"[🦾 IRONMAN]   → Text regions removed: {cleaner_result.get('text_regions_detected', 0)}")
-        if cleaner_result.get('dimension_lines_detected'):
-            print(f"[🦾 IRONMAN]   → Dimension lines removed: {cleaner_result.get('dimension_lines_detected', 0)}")
-        if 'google_vision_used' in cleaner_result:
-            vision_status = "Google Vision" if cleaner_result['google_vision_used'] else "OpenCV fallback"
-            print(f"[🦾 IRONMAN]   → Text detection: {vision_status}")
-        print(f"[🦾 IRONMAN]   → Cleaned image: {os.path.basename(cleaned_image_path)}")
-        
-        logger.log_agent_output("CLEANER", cleaner_result)
-    
-    # Step 3: Count ribs with RibFinder (using cleaned image)
+    # Step 3: Count ribs with RibFinder (using ORIGINAL image)
     print("\n[🦾 IRONMAN] [STEP 3] Counting ribs with RIBFINDER...")
-    print("[🦾 IRONMAN]   → Sending cleaned image to RIBFINDER (Premium Agent)")
+    print("[🦾 IRONMAN]   → Sending ORIGINAL drawing to RIBFINDER (Premium Agent)")
     print("[🦾 IRONMAN]   → Using GPT-4o for maximum rib counting accuracy...")
+    print("[🦾 IRONMAN]   → Note: Using uncleaned original image")
     
     logger.log_step_start(3, "Counting ribs with RIBFINDER", "RIBFINDER")
     
-    rib_result = ribfinder.count_ribs(cleaned_image_path)
+    rib_result = ribfinder.count_ribs(file_path)
     
     if "error" in rib_result:
         print(f"[🦾 IRONMAN]   ❌ RIBFINDER Error: {rib_result['error']}")

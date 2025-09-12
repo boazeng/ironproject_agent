@@ -1,0 +1,152 @@
+{
+  "file": "CO25S006348.pdf",
+  "file_type": "pdf",
+  "sections": {
+    "header": {
+      "found": true,
+      "location": "top",
+      "company_name": "",
+      "order_number": "2800",
+      "date": "",
+      "customer": "ג.א. פרוייקט - מזרחי ודרימונה",
+      "header_table": {
+        "found": true,
+        "rows": 2,
+        "key_values": [
+          {
+            "לקוח / פרוייקט": "ג.א. פרוייקט - מזרחי ודרימונה"
+          },
+          {
+            "איש הקשר באתר": "דניאל אונגרין"
+          },
+          {
+            "טלפון": "508932525"
+          },
+          {
+            "מס' הזמנה": "2800"
+          },
+          {
+            "משקל": "4,183 Kg"
+          }
+        ]
+      }
+    },
+    "main_table": {
+      "found": true,
+      "location": "middle",
+      "row_count": 6,
+      "columns": [
+        "מס'",
+        "תיאור",
+        "קוטר [mm]",
+        "אורך [m]",
+        "סה\"כ משקל [kg]"
+      ],
+      "contains_iron_orders": true,
+      "sample_items": [
+        {
+          "מס'": "1",
+          "תיאור": "150",
+          "קוטר [mm]": "12",
+          "אורך [m]": "18",
+          "סה\"כ משקל [kg]": "24.0"
+        },
+        {
+          "מס'": "2",
+          "תיאור": "500",
+          "קוטר [mm]": "12",
+          "אורך [m]": "4",
+          "סה\"כ משקל [kg]": "17.8"
+        }
+      ]
+    },
+    "footer": {
+      "found": false,
+      "location": "bottom",
+      "total_amount": "",
+      "terms": "",
+      "signatures": false,
+      "contact_info": ""
+    }
+  },
+  "ocr_data": {
+    "error": "Google Vision not initialized",
+    "text": "",
+    "blocks": []
+  },
+  "analysis": {
+    "document_type": "order_page",
+    "language": "mixed",
+    "sections": {
+      "header": {
+        "found": true,
+        "location": "top",
+        "company_name": "",
+        "order_number": "2800",
+        "date": "",
+        "customer": "ג.א. פרוייקט - מזרחי ודרימונה",
+        "header_table": {
+          "found": true,
+          "rows": 2,
+          "key_values": [
+            {
+              "לקוח / פרוייקט": "ג.א. פרוייקט - מזרחי ודרימונה"
+            },
+            {
+              "איש הקשר באתר": "דניאל אונגרין"
+            },
+            {
+              "טלפון": "508932525"
+            },
+            {
+              "מס' הזמנה": "2800"
+            },
+            {
+              "משקל": "4,183 Kg"
+            }
+          ]
+        }
+      },
+      "main_table": {
+        "found": true,
+        "location": "middle",
+        "row_count": 6,
+        "columns": [
+          "מס'",
+          "תיאור",
+          "קוטר [mm]",
+          "אורך [m]",
+          "סה\"כ משקל [kg]"
+        ],
+        "contains_iron_orders": true,
+        "sample_items": [
+          {
+            "מס'": "1",
+            "תיאור": "150",
+            "קוטר [mm]": "12",
+            "אורך [m]": "18",
+            "סה\"כ משקל [kg]": "24.0"
+          },
+          {
+            "מס'": "2",
+            "תיאור": "500",
+            "קוטר [mm]": "12",
+            "אורך [m]": "4",
+            "סה\"כ משקל [kg]": "17.8"
+          }
+        ]
+      },
+      "footer": {
+        "found": false,
+        "location": "bottom",
+        "total_amount": "",
+        "terms": "",
+        "signatures": false,
+        "contact_info": ""
+      }
+    },
+    "summary": "This document is an order page containing a header with customer and order details, a main table listing items with specifications, and no visible footer information."
+  },
+  "pdf_pages": 4,
+  "analyzing_page": 1
+}
