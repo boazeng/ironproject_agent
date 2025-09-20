@@ -830,23 +830,27 @@ class Form1S4Agent:
             os.makedirs(output_dir, exist_ok=True)
             saved_files = []
 
-            # Extract page number from input filename if provided
-            page_prefix = ""
-            if input_file_path:
-                input_filename = os.path.basename(input_file_path)
-                if "_page1_gridlines.png" in input_filename:
-                    base_name = input_filename.replace("_ordertable_page1_gridlines.png", "")
-                    page_prefix = f"{base_name}_"
+            # Extract order name and page number from input file path
+            base_name = os.path.basename(input_file_path)
+            # Extract from patterns like CO25S006375_ordertable_page1_gridlines.png
+            order_name = "unknown"
+            page_num = "1"
+
+            if "_ordertable_" in base_name:
+                order_name = base_name.split("_ordertable_")[0]
+                if "_page" in base_name:
+                    try:
+                        page_part = base_name.split("_page")[1]
+                        page_num = page_part.split("_")[0]
+                    except:
+                        page_num = "1"
 
             for cell in extracted_cells:
                 row_index = cell["row_index"]
                 cell_image = cell["cell_image"]
 
-                # Generate filename with page number
-                if page_prefix:
-                    filename = f"{page_prefix}drawing_row_{row_index}_page1.png"
-                else:
-                    filename = f"drawing_row_{row_index}.png"
+                # Generate filename with order name and page number
+                filename = f"{order_name}_drawing_row_{row_index}_page{page_num}.png"
                 file_path = os.path.join(output_dir, filename)
 
                 # Save the image

@@ -65,11 +65,14 @@ class Form1S31Agent:
             # Save the extracted table body
             os.makedirs(output_dir, exist_ok=True)
 
-            # Extract page number from input filename (e.g., CO25S006375_ordertable_page1_gridlines.png -> CO25S006375_table_body_page1.png)
+            # Extract page number from input filename (e.g., CO25S006375_ordertable_page2_gridlines.png -> CO25S006375_table_body_page2.png)
             input_filename = os.path.basename(input_file)
-            if "_page1_gridlines.png" in input_filename:
-                base_name = input_filename.replace("_ordertable_page1_gridlines.png", "")
-                output_filename = f"{base_name}_table_body_page1.png"
+            import re
+            page_match = re.search(r'_page(\d+)_gridlines\.png$', input_filename)
+            if page_match:
+                page_num = page_match.group(1)
+                base_name = input_filename.replace(f"_ordertable_page{page_num}_gridlines.png", "")
+                output_filename = f"{base_name}_table_body_page{page_num}.png"
             else:
                 output_filename = "table_body.png"
 

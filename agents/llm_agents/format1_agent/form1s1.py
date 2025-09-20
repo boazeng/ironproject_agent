@@ -10,27 +10,33 @@ logger = logging.getLogger(__name__)
 class Form1S1Agent:
     """
     Form1S1 Agent - Page Extraction
-    Extracts first page from PDF and converts to image
+    Extracts ALL pages from PDF and converts them to images
+    Saves all pages to order_to_image folder
+    Also saves first page to main output folder for backward compatibility
     """
 
     def __init__(self):
         self.name = "form1s1"
         self.short_name = "form1s1"
         self.output_dir = "io/fullorder_output"
+        self.order_to_image_dir = "io/fullorder_output/order_to_image"
+        self.original_order_dir = "io/fullorder_output/original_order"
         logger.info(f"[{self.short_name.upper()}] Agent initialized - Format 1 Step 1 processor")
 
-        # Create output directory if it doesn't exist
+        # Create output directories if they don't exist
         os.makedirs(self.output_dir, exist_ok=True)
+        os.makedirs(self.order_to_image_dir, exist_ok=True)
+        os.makedirs(self.original_order_dir, exist_ok=True)
 
     def process_order(self, file_path):
         """
-        Process an order file - extract first page and convert to image
+        Process an order file - extract ALL pages and convert to images
 
         Args:
             file_path (str): Path to the input PDF file
 
         Returns:
-            dict: Processing results including output file path
+            dict: Processing results including output file paths for all pages
         """
         try:
             logger.info(f"[{self.short_name.upper()}] Starting processing for: {file_path}")
@@ -59,7 +65,7 @@ class Form1S1Agent:
                 logger.warning(f"[{self.short_name.upper()}] Not a PDF file, copying as is: {file_path}")
                 # If it's already an image, just copy it
                 if file_path.lower().endswith(('.png', '.jpg', '.jpeg')):
-                    output_path = os.path.join(self.output_dir, f"{order_name}_page1.png")
+                    output_path = os.path.join(self.order_to_image_dir, f"{order_name}_page1.png")
                     img = Image.open(file_path)
                     img.save(output_path, 'PNG')
                     result["status"] = "success"
@@ -72,8 +78,8 @@ class Form1S1Agent:
                     result["error"] = "File is not a PDF or supported image format"
                     return result
 
-            # Convert PDF to image (first page only)
-            logger.info(f"[{self.short_name.upper()}] Converting PDF first page to image...")
+            # Convert PDF to images (all pages)
+            logger.info(f"[{self.short_name.upper()}] Converting PDF to images...")
 
             try:
                 # Open PDF with PyMuPDF
@@ -86,45 +92,83 @@ class Form1S1Agent:
                     pdf_document.close()
                     return result
 
-                # Get first page
-                first_page = pdf_document[0]
+                total_pages = len(pdf_document)
+                logger.info(f"[{self.short_name.upper()}] Found {total_pages} pages in PDF")
 
-                # Convert to image at 300 DPI
-                mat = fitz.Matrix(300/72, 300/72)  # 300 DPI scaling
-                pix = first_page.get_pixmap(matrix=mat)
+                page_files = []
+                first_page_path = None
+                first_page_width = None
+                first_page_height = None
 
-                # Convert to PIL Image
-                import io
-                img_data = pix.tobytes("png")
-                img = Image.open(io.BytesIO(img_data))
+                # Convert all pages to images
+                for page_num in range(total_pages):
+                    page = pdf_document[page_num]
 
-                # Save the image
-                output_filename = f"{order_name}_page1.png"
-                output_path = os.path.join(self.output_dir, output_filename)
-                img.save(output_path, 'PNG')
+                    # Convert to image at 300 DPI
+                    mat = fitz.Matrix(300/72, 300/72)  # 300 DPI scaling
+                    pix = page.get_pixmap(matrix=mat)
+
+                    # Convert to PIL Image
+                    import io
+                    img_data = pix.tobytes("png")
+                    img = Image.open(io.BytesIO(img_data))
+
+                    # Save the image to order_to_image folder
+                    page_filename = f"{order_name}_page{page_num + 1}.png"
+                    page_path = os.path.join(self.order_to_image_dir, page_filename)
+                    img.save(page_path, 'PNG')
+
+                    page_files.append({
+                        "filename": page_filename,
+                        "path": page_path,
+                        "page_number": page_num + 1,
+                        "width": img.size[0],
+                        "height": img.size[1]
+                    })
+
+                    # Keep track of first page details
+                    if page_num == 0:
+                        first_page_width = img.size[0]
+                        first_page_height = img.size[1]
+
+                    logger.info(f"[{self.short_name.upper()}] Page {page_num + 1} saved to: {page_path}")
 
                 # Close PDF document
                 pdf_document.close()
 
-                logger.info(f"[{self.short_name.upper()}] First page saved to: {output_path}")
+                logger.info(f"[{self.short_name.upper()}] All {total_pages} pages converted successfully")
 
-                # Get image dimensions
-                width, height = img.size
+                # Copy original file to original_order directory
+                import shutil
+                original_filename = os.path.basename(file_path)
+                original_destination = os.path.join(self.original_order_dir, original_filename)
+
+                try:
+                    shutil.copy2(file_path, original_destination)
+                    logger.info(f"[{self.short_name.upper()}] Original file copied to: {original_destination}")
+                    original_file_copied = True
+                    original_file_path = original_destination
+                except Exception as copy_error:
+                    logger.warning(f"[{self.short_name.upper()}] Failed to copy original file: {str(copy_error)}")
+                    original_file_copied = False
+                    original_file_path = None
 
                 result["status"] = "success"
-                result["output_file"] = output_path
-                result["output_filename"] = output_filename
-                result["image_width"] = width
-                result["image_height"] = height
+                result["output_file"] = first_page_path  # Keep backward compatibility
+                result["output_filename"] = f"{order_name}_page1.png"
+                result["image_width"] = first_page_width
+                result["image_height"] = first_page_height
                 result["dpi"] = 300
-                result["page_number"] = 1
-                result["message"] = f"Successfully extracted page 1 from {file_name}"
+                result["total_pages"] = total_pages
+                result["page_files"] = page_files
+                result["order_to_image_dir"] = self.order_to_image_dir
+                result["original_file_copied"] = original_file_copied
+                result["original_file_path"] = original_file_path
+                result["original_order_dir"] = self.original_order_dir
+                result["message"] = f"Successfully extracted all {total_pages} pages from {file_name}"
 
-                # Save result to JSON
-                json_output_path = os.path.join(self.output_dir, f"{order_name}_{self.short_name}_result.json")
-                with open(json_output_path, 'w', encoding='utf-8') as f:
-                    json.dump(result, f, indent=2, ensure_ascii=False)
-                logger.info(f"[{self.short_name.upper()}] Results saved to: {json_output_path}")
+                # JSON result file creation disabled
+                # logger.info(f"[{self.short_name.upper()}] Results saved to: {json_output_path}")
 
             except Exception as e:
                 logger.error(f"[{self.short_name.upper()}] Error converting PDF: {str(e)}")

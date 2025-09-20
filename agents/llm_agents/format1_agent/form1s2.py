@@ -149,11 +149,14 @@ return a base64 file"""
             output_dir = os.path.join(project_root, "io", "fullorder_output", "table_detection", "grid")
             os.makedirs(output_dir, exist_ok=True)
 
-            # Extract page number from input filename (e.g., CO25S006375_page1.png -> CO25S006375_ordertable_page1.png)
+            # Extract page number from input filename (e.g., CO25S006375_page2.png -> CO25S006375_ordertable_page2.png)
             input_filename = os.path.basename(image_path)
-            if "_page1.png" in input_filename:
-                base_name = input_filename.replace("_page1.png", "")
-                output_filename = f"{base_name}_ordertable_page1.png"
+            import re
+            page_match = re.search(r'_page(\d+)\.png$', input_filename)
+            if page_match:
+                page_num = page_match.group(1)
+                base_name = input_filename.replace(f"_page{page_num}.png", "")
+                output_filename = f"{base_name}_ordertable_page{page_num}.png"
             else:
                 output_filename = "ordertable.png"
 

@@ -237,11 +237,14 @@ class Form1S32Agent:
             # Save results to JSON file
             os.makedirs(output_dir, exist_ok=True)
 
-            # Extract page number from input filename (e.g., CO25S006375_table_body_page1.png -> CO25S006375_order_line_count_page1.json)
+            # Extract page number from input filename (e.g., CO25S006375_table_body_page2.png -> CO25S006375_order_line_count_page2.json)
             input_filename = os.path.basename(input_file)
-            if "_table_body_page1.png" in input_filename:
-                base_name = input_filename.replace("_table_body_page1.png", "")
-                output_filename = f"{base_name}_order_line_count_page1.json"
+            import re
+            page_match = re.search(r'_table_body_page(\d+)\.png$', input_filename)
+            if page_match:
+                page_num = page_match.group(1)
+                base_name = input_filename.replace(f"_table_body_page{page_num}.png", "")
+                output_filename = f"{base_name}_order_line_count_page{page_num}.json"
             else:
                 output_filename = "order_line_count.json"
 
