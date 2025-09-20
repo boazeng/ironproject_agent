@@ -64,7 +64,16 @@ class Form1S31Agent:
 
             # Save the extracted table body
             os.makedirs(output_dir, exist_ok=True)
-            output_file = os.path.join(output_dir, "table_body.png")
+
+            # Extract page number from input filename (e.g., CO25S006375_ordertable_page1_gridlines.png -> CO25S006375_table_body_page1.png)
+            input_filename = os.path.basename(input_file)
+            if "_page1_gridlines.png" in input_filename:
+                base_name = input_filename.replace("_ordertable_page1_gridlines.png", "")
+                output_filename = f"{base_name}_table_body_page1.png"
+            else:
+                output_filename = "table_body.png"
+
+            output_file = os.path.join(output_dir, output_filename)
             cv2.imwrite(output_file, table_body)
 
             result = {
@@ -223,7 +232,7 @@ def main():
     agent = Form1S31Agent()
 
     # Test file paths
-    input_file = "io/fullorder_output/table_detection/ordertable_gridlines.png"
+    input_file = "io/fullorder_output/table_detection/grid/CO25S006375_ordertable_page1_gridlines.png"
     output_dir = "io/fullorder_output/table_detection/table"
 
     # Process the file

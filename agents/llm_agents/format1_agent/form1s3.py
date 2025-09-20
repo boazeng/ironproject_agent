@@ -213,7 +213,7 @@ class Form1S3Agent:
             # Step 5: Save the result
             # Use absolute path relative to project root
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            output_dir = os.path.join(project_root, "io", "fullorder_output", "table_detection")
+            output_dir = os.path.join(project_root, "io", "fullorder_output", "table_detection", "grid")
             os.makedirs(output_dir, exist_ok=True)
 
             # Generate output filename based on input
@@ -264,8 +264,8 @@ def main():
     try:
         agent = Form1S3Agent()
 
-        # Look for the output from form1s2 (ordertable.png)
-        input_path = "../../../io/fullorder_output/table_detection/ordertable.png"
+        # Look for the output from form1s2 (ordertable.png) in grid folder with page number
+        input_path = "../../../io/fullorder_output/table_detection/grid/CO25S006375_ordertable_page1.png"
 
         if not os.path.exists(input_path):
             print(f"Input file not found: {input_path}")

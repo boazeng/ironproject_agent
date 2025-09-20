@@ -3,7 +3,7 @@ import logging
 import json
 from datetime import datetime
 from pathlib import Path
-from .order_format1_step1 import OrderFormat1Step1Agent
+from .form1s1 import Form1S1Agent
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +32,7 @@ class OrderFormat1MainAgent:
         """Initialize all sub-agents"""
         try:
             if not self.agents["form1s1"]:
-                self.agents["form1s1"] = OrderFormat1Step1Agent()
+                self.agents["form1s1"] = Form1S1Agent()
                 logger.info(f"[{self.short_name.upper()}] Initialized form1s1 agent")
             return True
         except Exception as e:

@@ -143,12 +143,21 @@ return a base64 file"""
 
             logger.info(f"[{self.name.upper()}] Drew red rectangle on image")
 
-            # Save the result image in fullorder_output/table_detection folder
+            # Save the result image in fullorder_output/table_detection/grid folder
             # Use absolute path relative to project root
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            output_dir = os.path.join(project_root, "io", "fullorder_output", "table_detection")
+            output_dir = os.path.join(project_root, "io", "fullorder_output", "table_detection", "grid")
             os.makedirs(output_dir, exist_ok=True)
-            output_path = os.path.join(output_dir, "ordertable.png")
+
+            # Extract page number from input filename (e.g., CO25S006375_page1.png -> CO25S006375_ordertable_page1.png)
+            input_filename = os.path.basename(image_path)
+            if "_page1.png" in input_filename:
+                base_name = input_filename.replace("_page1.png", "")
+                output_filename = f"{base_name}_ordertable_page1.png"
+            else:
+                output_filename = "ordertable.png"
+
+            output_path = os.path.join(output_dir, output_filename)
             cv2.imwrite(output_path, result_image)
             logger.info(f"[{self.name.upper()}] Saved result image: {output_path}")
 

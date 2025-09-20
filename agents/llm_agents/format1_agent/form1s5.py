@@ -214,11 +214,15 @@ class Form1S5Agent:
                     "error": error_msg
                 }
 
-            # Determine order name from input filename
+            # Determine order name from input filename with page number
             input_filename = os.path.basename(input_path)
-            if "ordertable_gridlines" in input_filename:
-                # Extract order name from the directory structure or use generic name
-                order_name = "order_title"
+            if "_page1_gridlines.png" in input_filename:
+                # Extract order name from gridlines filename (e.g., CO25S006375_ordertable_page1_gridlines.png -> CO25S006375_order_title_page1)
+                base_name = input_filename.replace("_ordertable_page1_gridlines.png", "")
+                order_name = f"{base_name}_order_title_page1"
+            elif "ordertable_gridlines" in input_filename:
+                # Fallback for old naming convention
+                order_name = "order_title_order_header"
             else:
                 # Extract from filename
                 order_name = os.path.splitext(input_filename)[0]
@@ -266,7 +270,7 @@ def main():
     agent = Form1S5Agent()
 
     # Test with the expected input file
-    input_file = "io/fullorder_output/table_detection/ordertable_gridlines.png"
+    input_file = "io/fullorder_output/table_detection/grid/CO25S006375_ordertable_page1_gridlines.png"
 
     if os.path.exists(input_file):
         print(f"Testing {agent.short_name} with: {input_file}")

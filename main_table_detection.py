@@ -11,6 +11,7 @@ Workflow:
 
 import os
 import sys
+import glob
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -276,13 +277,15 @@ class TableDetectionPipeline:
             form1s3_agent = Form1S3Agent()
             print(f"[FORM1S3] Agent initialized: {form1s3_agent.name}")
 
-            # Look for ordertable.png from form1s2 output
-            ordertable_path = f"{self.output_dir}/table_detection/ordertable.png"
+            # Look for ordertable.png from form1s2 output in grid folder with page number
+            ordertable_files = glob.glob(f"{self.output_dir}/table_detection/grid/*_ordertable_page1.png")
 
-            if not os.path.exists(ordertable_path):
-                print(f"[FORM1S3] ordertable.png not found at {ordertable_path}")
+            if not ordertable_files:
+                print(f"[FORM1S3] ordertable.png not found at {self.output_dir}/table_detection/grid/*_ordertable_page1.png")
                 self.results["form1s3"] = {"status": "no_files"}
                 return True
+
+            ordertable_path = ordertable_files[0]  # Use first matching file
 
             print(f"[FORM1S3] Found ordertable.png, processing grid line detection")
 
@@ -347,13 +350,15 @@ class TableDetectionPipeline:
             form1s3_1_agent = Form1S31Agent()
             print(f"[FORM1S3.1] Agent initialized: {form1s3_1_agent.name}")
 
-            # Look for ordertable_gridlines.png from form1s3 output
-            gridlines_path = f"{self.output_dir}/table_detection/ordertable_gridlines.png"
+            # Look for ordertable_gridlines.png from form1s3 output in grid folder with page number
+            gridlines_files = glob.glob(f"{self.output_dir}/table_detection/grid/*_ordertable_page1_gridlines.png")
 
-            if not os.path.exists(gridlines_path):
-                print(f"[FORM1S3.1] ordertable_gridlines.png not found at {gridlines_path}")
+            if not gridlines_files:
+                print(f"[FORM1S3.1] ordertable_gridlines.png not found at {self.output_dir}/table_detection/grid/*_ordertable_page1_gridlines.png")
                 self.results["form1s3_1"] = {"status": "no_files"}
                 return True
+
+            gridlines_path = gridlines_files[0]  # Use first matching file
 
             print(f"[FORM1S3.1] Found ordertable_gridlines.png, processing table body extraction")
 
@@ -404,13 +409,15 @@ class TableDetectionPipeline:
             form1s3_2_agent = Form1S32Agent()
             print(f"[FORM1S3.2] Agent initialized: {form1s3_2_agent.name}")
 
-            # Look for table_body.png from form1s3.1 output
-            table_body_path = f"{self.output_dir}/table_detection/table/table_body.png"
+            # Look for table_body.png from form1s3.1 output with page number
+            table_body_files = glob.glob(f"{self.output_dir}/table_detection/table/*_table_body_page1.png")
 
-            if not os.path.exists(table_body_path):
-                print(f"[FORM1S3.2] table_body.png not found at {table_body_path}")
+            if not table_body_files:
+                print(f"[FORM1S3.2] table_body.png not found at {self.output_dir}/table_detection/table/*_table_body_page1.png")
                 self.results["form1s3_2"] = {"status": "no_files"}
                 return True
+
+            table_body_path = table_body_files[0]  # Use first matching file
 
             print(f"[FORM1S3.2] Found table_body.png, processing order line counting")
 
@@ -466,13 +473,15 @@ class TableDetectionPipeline:
             form1s4_agent = Form1S4Agent()
             print(f"[FORM1S4] Agent initialized: {form1s4_agent.name}")
 
-            # Look for ordertable_gridlines.png from form1s3 output
-            gridlines_path = f"{self.output_dir}/table_detection/ordertable_gridlines.png"
+            # Look for ordertable_gridlines.png from form1s3 output in grid folder with page number
+            gridlines_files = glob.glob(f"{self.output_dir}/table_detection/grid/*_ordertable_page1_gridlines.png")
 
-            if not os.path.exists(gridlines_path):
-                print(f"[FORM1S4] ordertable_gridlines.png not found at {gridlines_path}")
+            if not gridlines_files:
+                print(f"[FORM1S4] ordertable_gridlines.png not found at {self.output_dir}/table_detection/grid/*_ordertable_page1_gridlines.png")
                 self.results["form1s4"] = {"status": "no_files"}
                 return True
+
+            gridlines_path = gridlines_files[0]  # Use first matching file
 
             print(f"[FORM1S4] Found ordertable_gridlines.png, processing drawing cell extraction")
 
@@ -545,13 +554,15 @@ class TableDetectionPipeline:
             form1s5_agent = Form1S5Agent()
             print(f"[FORM1S5] Agent initialized: {form1s5_agent.name}")
 
-            # Look for ordertable_gridlines.png from form1s3 output
-            gridlines_path = f"{self.output_dir}/table_detection/ordertable_gridlines.png"
+            # Look for ordertable_gridlines.png from form1s3 output in grid folder with page number
+            gridlines_files = glob.glob(f"{self.output_dir}/table_detection/grid/*_ordertable_page1_gridlines.png")
 
-            if not os.path.exists(gridlines_path):
-                print(f"[FORM1S5] ordertable_gridlines.png not found at {gridlines_path}")
+            if not gridlines_files:
+                print(f"[FORM1S5] ordertable_gridlines.png not found at {self.output_dir}/table_detection/grid/*_ordertable_page1_gridlines.png")
                 self.results["form1s5"] = {"status": "no_files"}
                 return True
+
+            gridlines_path = gridlines_files[0]  # Use first matching file
 
             print(f"[FORM1S5] Found ordertable_gridlines.png, processing order title extraction")
 

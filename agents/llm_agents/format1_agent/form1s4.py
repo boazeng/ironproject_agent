@@ -814,13 +814,14 @@ class Form1S4Agent:
             logger.error(f"[{self.name.upper()}] Error extracting drawing cells: {str(e)}")
             return []
 
-    def save_drawing_cells(self, extracted_cells, output_dir):
+    def save_drawing_cells(self, extracted_cells, output_dir, input_file_path=None):
         """
         Save extracted drawing cells as PNG files.
 
         Args:
             extracted_cells: List of cell dictionaries from extract_drawing_cells
             output_dir: Directory to save the PNG files
+            input_file_path: Input file path to extract page number from
 
         Returns:
             List of saved file paths
@@ -829,12 +830,23 @@ class Form1S4Agent:
             os.makedirs(output_dir, exist_ok=True)
             saved_files = []
 
+            # Extract page number from input filename if provided
+            page_prefix = ""
+            if input_file_path:
+                input_filename = os.path.basename(input_file_path)
+                if "_page1_gridlines.png" in input_filename:
+                    base_name = input_filename.replace("_ordertable_page1_gridlines.png", "")
+                    page_prefix = f"{base_name}_"
+
             for cell in extracted_cells:
                 row_index = cell["row_index"]
                 cell_image = cell["cell_image"]
 
-                # Generate filename
-                filename = f"drawing_row_{row_index}.png"
+                # Generate filename with page number
+                if page_prefix:
+                    filename = f"{page_prefix}drawing_row_{row_index}_page1.png"
+                else:
+                    filename = f"drawing_row_{row_index}.png"
                 file_path = os.path.join(output_dir, filename)
 
                 # Save the image
@@ -906,7 +918,7 @@ class Form1S4Agent:
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
             output_dir = os.path.join(project_root, "io", "fullorder_output", "table_detection", "shapes")
 
-            saved_files = self.save_drawing_cells(extracted_cells, output_dir)
+            saved_files = self.save_drawing_cells(extracted_cells, output_dir, input_image_path)
 
             # Prepare result
             result = {
@@ -951,8 +963,8 @@ def main():
     try:
         agent = Form1S4Agent()
 
-        # Look for the output from form1s3 (ordertable_gridlines.png)
-        input_path = "../../../io/fullorder_output/table_detection/ordertable_gridlines.png"
+        # Look for the output from form1s3 (ordertable_gridlines.png) in grid folder with page number
+        input_path = "../../../io/fullorder_output/table_detection/grid/CO25S006375_ordertable_page1_gridlines.png"
 
         if not os.path.exists(input_path):
             print(f"Input file not found: {input_path}")

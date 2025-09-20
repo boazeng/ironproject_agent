@@ -7,15 +7,14 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-class OrderFormat1Step1Agent:
+class Form1S1Agent:
     """
-    Agent for processing Format 1 orders - Step 1
-    Short name: form1s1
+    Form1S1 Agent - Page Extraction
     Extracts first page from PDF and converts to image
     """
 
     def __init__(self):
-        self.name = "order_format1_step1"
+        self.name = "form1s1"
         self.short_name = "form1s1"
         self.output_dir = "io/fullorder_output"
         logger.info(f"[{self.short_name.upper()}] Agent initialized - Format 1 Step 1 processor")

@@ -236,7 +236,16 @@ class Form1S32Agent:
 
             # Save results to JSON file
             os.makedirs(output_dir, exist_ok=True)
-            output_file = os.path.join(output_dir, "order_line_count.json")
+
+            # Extract page number from input filename (e.g., CO25S006375_table_body_page1.png -> CO25S006375_order_line_count_page1.json)
+            input_filename = os.path.basename(input_file)
+            if "_table_body_page1.png" in input_filename:
+                base_name = input_filename.replace("_table_body_page1.png", "")
+                output_filename = f"{base_name}_order_line_count_page1.json"
+            else:
+                output_filename = "order_line_count.json"
+
+            output_file = os.path.join(output_dir, output_filename)
 
             with open(output_file, 'w', encoding='utf-8') as f:
                 json.dump(output_data, f, indent=2, ensure_ascii=False)
@@ -287,7 +296,7 @@ def main():
     agent = Form1S32Agent()
 
     # Test file paths
-    input_file = "io/fullorder_output/table_detection/table/table_body.png"
+    input_file = "io/fullorder_output/table_detection/table/CO25S006375_table_body_page1.png"
     output_dir = "io/fullorder_output/table_detection/table"
 
     # Process the file
