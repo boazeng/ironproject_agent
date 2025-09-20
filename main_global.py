@@ -180,9 +180,9 @@ def main():
     print("[🦾 IRONMAN]   ✓ GLOBAL (Document Analyzer) created and ready")
     logger.log_agent_creation("GLOBAL", "Full Order Document Analyzer")
     
-    # Check for input files in fullorder directory
-    print("\n[🦾 IRONMAN] Scanning fullorder directory...")
-    input_dir = "io/fullorder"
+    # Check for input files in input directory
+    print("\n[🦾 IRONMAN] Scanning input directory...")
+    input_dir = "io/input"
     if not os.path.exists(input_dir):
         os.makedirs(input_dir)
         print(f"[🦾 IRONMAN]   → Created input directory: {input_dir}")
@@ -191,9 +191,21 @@ def main():
         logger.log_error("No input files found", "SYSTEM")
         return
     
-    # List available files
-    print(f"[🦾 IRONMAN]   → Scanning: {input_dir}")
-    files = [f for f in os.listdir(input_dir) if f.lower().endswith(('.pdf', '.png', '.jpg', '.jpeg', '.bmp'))]
+    # Check if specific filename was provided as command line argument
+    if len(sys.argv) > 1:
+        specific_filename = sys.argv[1]
+        file_path = os.path.join(input_dir, specific_filename)
+        if os.path.exists(file_path):
+            print(f"[🦾 IRONMAN]   → Processing specific file: {specific_filename}")
+            files = [specific_filename]
+        else:
+            print(f"[🦾 IRONMAN]   ❌ Specific file not found: {specific_filename}")
+            logger.log_error(f"Specific file not found: {specific_filename}", "SYSTEM")
+            return
+    else:
+        # List available files (original behavior)
+        print(f"[🦾 IRONMAN]   → Scanning: {input_dir}")
+        files = [f for f in os.listdir(input_dir) if f.lower().endswith(('.pdf', '.png', '.jpg', '.jpeg', '.bmp'))]
     
     if not files:
         print("[🦾 IRONMAN]   ❌ No document files found")

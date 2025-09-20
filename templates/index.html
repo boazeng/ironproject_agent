@@ -50,6 +50,10 @@
             <div class="column-header">
                 <h2>תצוגת מסמך PDF</h2>
                 <div class="pdf-controls">
+                    <button id="select-file-btn" class="btn btn-small btn-primary">
+                        <span class="btn-icon">📁</span>
+                        בחר קובץ
+                    </button>
                     <button id="pdf-prev" class="btn-small">◀</button>
                     <span class="page-info">
                         עמוד <span id="page-num">1</span> מתוך <span id="page-count">1</span>
@@ -57,10 +61,30 @@
                     <button id="pdf-next" class="btn-small">▶</button>
                     <button id="pdf-zoom-in" class="btn-small">🔍+</button>
                     <button id="pdf-zoom-out" class="btn-small">🔍-</button>
+                    <button id="area-select-btn" class="btn-small btn-toggle" title="בחירת אזור">📐</button>
+                    <button id="clear-selections-btn" class="btn-small" title="נקה בחירות" style="display: none;">🗑️</button>
+                </div>
+                <div class="section-selection-controls" id="section-controls">
+                    <div class="section-controls-row">
+                        <button id="save-sections-btn" class="btn btn-primary btn-small" style="display: none;">
+                            <span class="btn-icon">💾</span>
+                            שמור הגדרות
+                        </button>
+                        <div class="section-buttons">
+                            <button id="select-order-header" class="btn-section" data-section="order_header" title="בחר כותרת הזמנה">כותרת הזמנה</button>
+                            <button id="select-table-header" class="btn-section" data-section="table_header" title="בחר כותרת טבלה">כותרת טבלה</button>
+                            <button id="select-table-area" class="btn-section" data-section="table_area" title="בחר אזור טבלה">אזור טבלה</button>
+                            <button id="select-shape-column" class="btn-section" data-section="shape_column" title="בחר עמודת צורות">עמודת צורות</button>
+                        </div>
+                    </div>
+                    <div class="selection-status">
+                        <span id="selection-status-text">בחר סוג אזור ולאחר מכן צייר על הPDF</span>
+                    </div>
                 </div>
             </div>
             <div class="pdf-viewer-container">
                 <canvas id="pdf-canvas"></canvas>
+                <canvas id="selection-canvas" class="selection-overlay"></canvas>
                 <div id="pdf-placeholder" class="placeholder">
                     <p>📄 לא נטען מסמך PDF</p>
                     <p>לחץ על "הרץ ניתוח" כדי להתחיל</p>
@@ -71,10 +95,23 @@
         <!-- Right Column: Extracted Data -->
         <div class="column data-column">
             <div class="column-header">
-                <h2>נתונים שחולצו</h2>
+                <div class="header-top">
+                    <h2>פרטי הזמנה</h2>
+                    <div class="header-buttons">
+                        <button id="clear-header-btn" class="btn btn-small btn-secondary">
+                            <span class="btn-icon">🗑️</span>
+                            נקה נתונים
+                        </button>
+                        <button id="redetect-header-btn" class="btn btn-small btn-primary">
+                            <span class="btn-icon">🔄</span>
+                            זיהוי מחדש
+                        </button>
+                    </div>
+                </div>
                 <div class="data-tabs">
                     <button class="tab-btn active" data-tab="header">כותרת</button>
                     <button class="tab-btn" data-tab="table">טבלת הזמנות</button>
+                    <button class="tab-btn" data-tab="shapes">צורות</button>
                     <button class="tab-btn" data-tab="raw">נתונים גולמיים</button>
                 </div>
             </div>
@@ -82,19 +119,6 @@
             <!-- Header Tab Content -->
             <div id="header-tab" class="tab-content active">
                 <div class="data-section">
-                    <div class="section-header">
-                        <h3>פרטי הזמנה</h3>
-                        <div class="header-buttons">
-                            <button id="clear-header-btn" class="btn btn-small btn-secondary">
-                                <span class="btn-icon">🗑️</span>
-                                נקה נתונים
-                            </button>
-                            <button id="redetect-header-btn" class="btn btn-small btn-primary">
-                                <span class="btn-icon">🔄</span>
-                                זיהוי מחדש
-                            </button>
-                        </div>
-                    </div>
                     <div class="data-grid" id="header-data">
                         <div class="data-row">
                             <span class="data-label">מספר הזמנה:</span>
@@ -103,6 +127,10 @@
                         <div class="data-row">
                             <span class="data-label">לקוח/פרויקט:</span>
                             <input class="data-editable" id="detail-customer" type="text" placeholder="-" data-field="customer">
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">שם התוכנית:</span>
+                            <input class="data-editable" id="detail-program-name" type="text" placeholder="-" data-field="programName">
                         </div>
                         <div class="data-row">
                             <span class="data-label">איש קשר:</span>
@@ -123,6 +151,16 @@
                     </div>
                     <div class="auto-save-info">
                         <span id="save-status"></span>
+                    </div>
+                    
+                    <!-- Order Header Image Section -->
+                    <div class="header-image-section" id="header-image-section" style="display: none;">
+                        <div class="section-header">
+                            <h4>תמונת הכותרת</h4>
+                        </div>
+                        <div class="header-image-container">
+                            <img id="order-header-image" src="" alt="תמונת כותרת הזמנה" class="header-image" />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -169,12 +207,59 @@
                 </div>
             </div>
 
+            <!-- Shapes Tab Content -->
+            <div id="shapes-tab" class="tab-content">
+                <div class="data-section">
+                    <div class="section-header">
+                        <h3>צורות שזוהו</h3>
+                        <div class="shapes-info">
+                            <span id="shapes-count">0 צורות נמצאו</span>
+                        </div>
+                        <div class="shapes-controls">
+                            <div class="column-input-group">
+                                <label for="shape-column-name">עמודת צורות:</label>
+                                <input type="text" id="shape-column-name" placeholder="צורה" value="צורה" class="column-input">
+                            </div>
+                            <button id="redetect-shapes-btn" class="btn btn-small btn-primary">
+                                <span class="btn-icon">🔄</span>
+                                זיהוי מחדש
+                            </button>
+                        </div>
+                    </div>
+                    <div class="shapes-container" id="shapes-container">
+                        <div class="no-shapes-placeholder">
+                            <p>🔍 לא נמצאו צורות</p>
+                            <p>הרץ ניתוח כדי לזהות צורות מהמסמך</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Raw Data Tab Content -->
             <div id="raw-tab" class="tab-content">
                 <div class="data-section">
                     <h3>נתונים גולמיים (JSON)</h3>
                     <pre id="raw-json" class="json-viewer">{}</pre>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Selection Modal -->
+    <div id="file-selection-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>בחירת קובץ מהתיקייה</h3>
+                <button id="close-file-modal" class="btn-close">×</button>
+            </div>
+            <div class="modal-body">
+                <div id="file-list-container">
+                    <div class="loading">טוען קבצים...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-file-selection" class="btn btn-secondary">ביטול</button>
+                <button id="confirm-file-selection" class="btn btn-primary" disabled>בחר קובץ</button>
             </div>
         </div>
     </div>

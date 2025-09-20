@@ -1,0 +1,327 @@
+{
+  "file": "CO25S006749.pdf",
+  "file_type": "pdf",
+  "sections": {
+    "header": {
+      "found": true,
+      "location": "top",
+      "company_name": "אלומה",
+      "order_number": "3757",
+      "date": "",
+      "customer": "",
+      "header_table": {
+        "found": true,
+        "rows": 1,
+        "key_values": [
+          {
+            "מס' הזמנה": "3757"
+          },
+          {
+            "תאריך אספקה": ""
+          },
+          {
+            "סוג": ""
+          },
+          {
+            "ספק": ""
+          },
+          {
+            "איש קשר": "רן"
+          },
+          {
+            "טלפון": "0506932485"
+          }
+        ]
+      }
+    },
+    "main_table": {
+      "found": true,
+      "location": "middle",
+      "row_count": 12,
+      "columns": [
+        "מס'",
+        "סה\"כ משקל [kg]",
+        "אורך [m]",
+        "סה\"כ יח'",
+        "קוטר [mm]",
+        "הערות"
+      ],
+      "contains_iron_orders": true,
+      "all_items": [
+        [
+          "13",
+          "475.08",
+          "214",
+          "100",
+          "14",
+          "ריתוך"
+        ],
+        [
+          "12",
+          "468.86",
+          "264",
+          "250",
+          "14",
+          "ריתוך"
+        ],
+        [
+          "11",
+          "222.00",
+          "250",
+          "115",
+          "20",
+          "ריתוך"
+        ],
+        [
+          "10",
+          "100.04",
+          "270",
+          "210",
+          "30",
+          "ריתוך"
+        ],
+        [
+          "9",
+          "371.62",
+          "196",
+          "50",
+          "48",
+          "ריתוך ספסלים"
+        ],
+        [
+          "8",
+          "200.50",
+          "282",
+          "64",
+          "49",
+          "ריתוך"
+        ],
+        [
+          "7",
+          "98.70",
+          "247",
+          "64",
+          "34",
+          "ריתוך"
+        ],
+        [
+          "6",
+          "278.71",
+          "252",
+          "64",
+          "34",
+          "ריתוך"
+        ],
+        [
+          "5",
+          "95.37",
+          "358",
+          "140",
+          "15",
+          "ריתוך"
+        ],
+        [
+          "4",
+          "265.44",
+          "210",
+          "110",
+          "50",
+          "ריתוך"
+        ],
+        [
+          "3",
+          "1016.40",
+          "280",
+          "115",
+          "50",
+          "ריתוך"
+        ],
+        [
+          "2",
+          "56.88",
+          "1200",
+          "1200",
+          "16",
+          "ריתוך 3 ליפטים"
+        ]
+      ]
+    },
+    "footer": {
+      "found": false,
+      "location": "bottom",
+      "total_amount": "",
+      "terms": "",
+      "signatures": false,
+      "contact_info": ""
+    }
+  },
+  "ocr_data": {
+    "error": "Google Vision not initialized",
+    "text": "",
+    "blocks": []
+  },
+  "analysis": {
+    "document_type": "order_page",
+    "language": "mixed",
+    "sections": {
+      "header": {
+        "found": true,
+        "location": "top",
+        "company_name": "אלומה",
+        "order_number": "3757",
+        "date": "",
+        "customer": "",
+        "header_table": {
+          "found": true,
+          "rows": 1,
+          "key_values": [
+            {
+              "מס' הזמנה": "3757"
+            },
+            {
+              "תאריך אספקה": ""
+            },
+            {
+              "סוג": ""
+            },
+            {
+              "ספק": ""
+            },
+            {
+              "איש קשר": "רן"
+            },
+            {
+              "טלפון": "0506932485"
+            }
+          ]
+        }
+      },
+      "main_table": {
+        "found": true,
+        "location": "middle",
+        "row_count": 12,
+        "columns": [
+          "מס'",
+          "סה\"כ משקל [kg]",
+          "אורך [m]",
+          "סה\"כ יח'",
+          "קוטר [mm]",
+          "הערות"
+        ],
+        "contains_iron_orders": true,
+        "all_items": [
+          [
+            "13",
+            "475.08",
+            "214",
+            "100",
+            "14",
+            "ריתוך"
+          ],
+          [
+            "12",
+            "468.86",
+            "264",
+            "250",
+            "14",
+            "ריתוך"
+          ],
+          [
+            "11",
+            "222.00",
+            "250",
+            "115",
+            "20",
+            "ריתוך"
+          ],
+          [
+            "10",
+            "100.04",
+            "270",
+            "210",
+            "30",
+            "ריתוך"
+          ],
+          [
+            "9",
+            "371.62",
+            "196",
+            "50",
+            "48",
+            "ריתוך ספסלים"
+          ],
+          [
+            "8",
+            "200.50",
+            "282",
+            "64",
+            "49",
+            "ריתוך"
+          ],
+          [
+            "7",
+            "98.70",
+            "247",
+            "64",
+            "34",
+            "ריתוך"
+          ],
+          [
+            "6",
+            "278.71",
+            "252",
+            "64",
+            "34",
+            "ריתוך"
+          ],
+          [
+            "5",
+            "95.37",
+            "358",
+            "140",
+            "15",
+            "ריתוך"
+          ],
+          [
+            "4",
+            "265.44",
+            "210",
+            "110",
+            "50",
+            "ריתוך"
+          ],
+          [
+            "3",
+            "1016.40",
+            "280",
+            "115",
+            "50",
+            "ריתוך"
+          ],
+          [
+            "2",
+            "56.88",
+            "1200",
+            "1200",
+            "16",
+            "ריתוך 3 ליפטים"
+          ]
+        ]
+      },
+      "footer": {
+        "found": false,
+        "location": "bottom",
+        "total_amount": "",
+        "terms": "",
+        "signatures": false,
+        "contact_info": ""
+      }
+    },
+    "summary": "This document is an order page for a company named אלומה, containing a detailed order table with specifications for various items, primarily related to welding and metalwork."
+  },
+  "pdf_pages": 2,
+  "analyzing_page": 1,
+  "table_image_path": "io\\fullorder_output\\table_detection\\table\\CO25S006749_main_table.png",
+  "table_header_image_path": "io\\fullorder_output\\table_detection\\table_header\\CO25S006749_table_header.png",
+  "order_header_image_path": "io\\fullorder_output\\table_detection\\order_header\\CO25S006749_order_header.png"
+}

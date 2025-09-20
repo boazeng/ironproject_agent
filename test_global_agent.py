@@ -34,8 +34,8 @@ def test_global_agent():
     global_agent = create_global_agent(api_key)
     print("[TEST] ✓ GLOBAL agent created")
     
-    # Check for input files in fullorder directory
-    input_dir = "io/fullorder"
+    # Check for input files in input directory
+    input_dir = "io/input"
     if not os.path.exists(input_dir):
         print(f"[TEST] ❌ Directory not found: {input_dir}")
         return

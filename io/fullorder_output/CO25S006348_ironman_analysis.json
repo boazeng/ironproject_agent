@@ -5,30 +5,49 @@
     "header": {
       "found": true,
       "location": "top",
-      "company_name": "",
+      "company_name": "דף ריכוז משווק ברזל",
       "order_number": "2800",
       "date": "",
-      "customer": "גל אריאל - מזרחי ודרמונה",
+      "customer": "",
       "header_table": {
         "found": true,
-        "rows": 2,
+        "rows": 1,
         "key_values": [
           {
-            "לקוח / פרויקט": "גל אריאל - מזרחי ודרמונה"
+            "לקוח/פרויקט": "גל אריאל - מדרכים דרומה"
           },
           {
-            "איש הקשר באתר": "דניאל אונגרין"
+            "איש הקשר באתר": "דניאל אוזן"
           },
           {
             "טלפון": "508932525"
           },
           {
-            "מספר הזמנה": "2800"
+            "מס' הזמנה": "2800"
           },
           {
-            "משקל כולל": "4,183 Kg"
+            "אתר": "סנ יבול נרה 13-9"
+          },
+          {
+            "כתובת האתר": ""
+          },
+          {
+            "אזור אספקה": ""
+          },
+          {
+            "סה\"כ משקל": "4,183 Kg"
           }
         ]
+      },
+      "area_position": {
+        "x": 61,
+        "y": 15,
+        "width": 1101,
+        "height": 126,
+        "description": "Order Header Area - Estimated",
+        "original_image_width": 1224,
+        "original_image_height": 1584,
+        "source": "estimated"
       }
     },
     "main_table": {
@@ -37,64 +56,73 @@
       "row_count": 6,
       "columns": [
         "מס'",
-        "תיאור",
-        "קוטר [mm]",
+        "סה\"כ משקל [kg]",
         "אורך [m]",
-        "סל\"ד 'ח'",
-        "סל\"ד 'ח'",
-        "סה\"כ משקל [kg]"
+        "סה\"כ יח'",
+        "קוטר [mm]",
+        "הערות"
       ],
       "contains_iron_orders": true,
       "all_items": [
         {
           "מס'": "1",
-          "תיאור": "ב.ע",
-          "קוטר [mm]": "12",
+          "סה\"כ משקל [kg]": "24.0",
           "אורך [m]": "1.5",
-          "סל\"ד 'ח'": "18",
-          "סה\"כ משקל [kg]": "24.0"
+          "סה\"כ יח'": "18",
+          "קוטר [mm]": "12",
+          "הערות": "150"
         },
         {
           "מס'": "2",
-          "תיאור": "",
-          "קוטר [mm]": "12",
+          "סה\"כ משקל [kg]": "17.8",
           "אורך [m]": "5",
-          "סל\"ד 'ח'": "4",
-          "סה\"כ משקל [kg]": "17.8"
+          "סה\"כ יח'": "4",
+          "קוטר [mm]": "12",
+          "הערות": "500"
         },
         {
           "מס'": "3",
-          "תיאור": "",
-          "קוטר [mm]": "12",
+          "סה\"כ משקל [kg]": "127.9",
           "אורך [m]": "2",
-          "סל\"ד 'ח'": "72",
-          "סה\"כ משקל [kg]": "127.9"
+          "סה\"כ יח'": "72",
+          "קוטר [mm]": "12",
+          "הערות": "200"
         },
         {
           "מס'": "4",
-          "תיאור": "",
-          "קוטר [mm]": "12",
+          "סה\"כ משקל [kg]": "241.5",
           "אורך [m]": "4",
-          "סל\"ד 'ח'": "68",
-          "סה\"כ משקל [kg]": "241.5"
+          "סה\"כ יח'": "68",
+          "קוטר [mm]": "12",
+          "הערות": "400"
         },
         {
           "מס'": "5",
-          "תיאור": "",
-          "קוטר [mm]": "12",
+          "סה\"כ משקל [kg]": "67.9",
           "אורך [m]": "4.5",
-          "סל\"ד 'ח'": "17",
-          "סה\"כ משקל [kg]": "67.9"
+          "סה\"כ יח'": "17",
+          "קוטר [mm]": "12",
+          "הערות": "450"
         },
         {
           "מס'": "6",
-          "תיאור": "",
-          "קוטר [mm]": "12",
+          "סה\"כ משקל [kg]": "202.5",
           "אורך [m]": "6",
-          "סל\"ד 'ח'": "38",
-          "סה\"כ משקל [kg]": "202.5"
+          "סה\"כ יח'": "38",
+          "קוטר [mm]": "12",
+          "הערות": "600"
         }
-      ]
+      ],
+      "area_position": {
+        "x": 61,
+        "y": 210,
+        "width": 1101,
+        "height": 712,
+        "description": "Main Table Area - Estimated",
+        "original_image_width": 1224,
+        "original_image_height": 1584,
+        "source": "estimated"
+      }
     },
     "footer": {
       "found": false,
@@ -103,6 +131,19 @@
       "terms": "",
       "signatures": false,
       "contact_info": ""
+    },
+    "table_header": {
+      "found": true,
+      "area_position": {
+        "x": 61,
+        "y": 156,
+        "width": 1101,
+        "height": 47,
+        "description": "Table Header Area - Estimated",
+        "original_image_width": 1224,
+        "original_image_height": 1584,
+        "source": "estimated"
+      }
     }
   },
   "ocr_data": {
@@ -112,35 +153,54 @@
   },
   "analysis": {
     "document_type": "order_page",
-    "language": "mixed",
+    "language": "hebrew",
     "sections": {
       "header": {
         "found": true,
         "location": "top",
-        "company_name": "",
+        "company_name": "דף ריכוז משווק ברזל",
         "order_number": "2800",
         "date": "",
-        "customer": "גל אריאל - מזרחי ודרמונה",
+        "customer": "",
         "header_table": {
           "found": true,
-          "rows": 2,
+          "rows": 1,
           "key_values": [
             {
-              "לקוח / פרויקט": "גל אריאל - מזרחי ודרמונה"
+              "לקוח/פרויקט": "גל אריאל - מדרכים דרומה"
             },
             {
-              "איש הקשר באתר": "דניאל אונגרין"
+              "איש הקשר באתר": "דניאל אוזן"
             },
             {
               "טלפון": "508932525"
             },
             {
-              "מספר הזמנה": "2800"
+              "מס' הזמנה": "2800"
             },
             {
-              "משקל כולל": "4,183 Kg"
+              "אתר": "סנ יבול נרה 13-9"
+            },
+            {
+              "כתובת האתר": ""
+            },
+            {
+              "אזור אספקה": ""
+            },
+            {
+              "סה\"כ משקל": "4,183 Kg"
             }
           ]
+        },
+        "area_position": {
+          "x": 61,
+          "y": 15,
+          "width": 1101,
+          "height": 126,
+          "description": "Order Header Area - Estimated",
+          "original_image_width": 1224,
+          "original_image_height": 1584,
+          "source": "estimated"
         }
       },
       "main_table": {
@@ -149,64 +209,73 @@
         "row_count": 6,
         "columns": [
           "מס'",
-          "תיאור",
-          "קוטר [mm]",
+          "סה\"כ משקל [kg]",
           "אורך [m]",
-          "סל\"ד 'ח'",
-          "סל\"ד 'ח'",
-          "סה\"כ משקל [kg]"
+          "סה\"כ יח'",
+          "קוטר [mm]",
+          "הערות"
         ],
         "contains_iron_orders": true,
         "all_items": [
           {
             "מס'": "1",
-            "תיאור": "ב.ע",
-            "קוטר [mm]": "12",
+            "סה\"כ משקל [kg]": "24.0",
             "אורך [m]": "1.5",
-            "סל\"ד 'ח'": "18",
-            "סה\"כ משקל [kg]": "24.0"
+            "סה\"כ יח'": "18",
+            "קוטר [mm]": "12",
+            "הערות": "150"
           },
           {
             "מס'": "2",
-            "תיאור": "",
-            "קוטר [mm]": "12",
+            "סה\"כ משקל [kg]": "17.8",
             "אורך [m]": "5",
-            "סל\"ד 'ח'": "4",
-            "סה\"כ משקל [kg]": "17.8"
+            "סה\"כ יח'": "4",
+            "קוטר [mm]": "12",
+            "הערות": "500"
           },
           {
             "מס'": "3",
-            "תיאור": "",
-            "קוטר [mm]": "12",
+            "סה\"כ משקל [kg]": "127.9",
             "אורך [m]": "2",
-            "סל\"ד 'ח'": "72",
-            "סה\"כ משקל [kg]": "127.9"
+            "סה\"כ יח'": "72",
+            "קוטר [mm]": "12",
+            "הערות": "200"
           },
           {
             "מס'": "4",
-            "תיאור": "",
-            "קוטר [mm]": "12",
+            "סה\"כ משקל [kg]": "241.5",
             "אורך [m]": "4",
-            "סל\"ד 'ח'": "68",
-            "סה\"כ משקל [kg]": "241.5"
+            "סה\"כ יח'": "68",
+            "קוטר [mm]": "12",
+            "הערות": "400"
           },
           {
             "מס'": "5",
-            "תיאור": "",
-            "קוטר [mm]": "12",
+            "סה\"כ משקל [kg]": "67.9",
             "אורך [m]": "4.5",
-            "סל\"ד 'ח'": "17",
-            "סה\"כ משקל [kg]": "67.9"
+            "סה\"כ יח'": "17",
+            "קוטר [mm]": "12",
+            "הערות": "450"
           },
           {
             "מס'": "6",
-            "תיאור": "",
-            "קוטר [mm]": "12",
+            "סה\"כ משקל [kg]": "202.5",
             "אורך [m]": "6",
-            "סל\"ד 'ח'": "38",
-            "סה\"כ משקל [kg]": "202.5"
+            "סה\"כ יח'": "38",
+            "קוטר [mm]": "12",
+            "הערות": "600"
           }
-        ]
+        ],
+        "area_position": {
+          "x": 61,
+          "y": 210,
+          "width": 1101,
+          "height": 712,
+          "description": "Main Table Area - Estimated",
+          "original_image_width": 1224,
+          "original_image_height": 1584,
+          "source": "estimated"
+        }
       },
       "footer": {
         "found": false,
@@ -215,12 +284,96 @@
         "terms": "",
         "signatures": false,
         "contact_info": ""
+      },
+      "table_header": {
+        "found": true,
+        "area_position": {
+          "x": 61,
+          "y": 156,
+          "width": 1101,
+          "height": 47,
+          "description": "Table Header Area - Estimated",
+          "original_image_width": 1224,
+          "original_image_height": 1584,
+          "source": "estimated"
+        }
       }
     },
-    "summary": "This document is an order page containing customer details, order number, and a main table listing items with specifications such as diameter, length, and weight. The text is primarily in Hebrew with some English."
+    "summary": "This document is an order page for iron products, containing a header with customer and order details, a main table listing the ordered items, and no visible footer information."
   },
   "pdf_pages": 4,
   "analyzing_page": 1,
-  "table_image_path": "io\\fullorder_output\\table_detection\\CO25S006348_main_table.png",
-  "table_header_image_path": "io\\fullorder_output\\table_detection\\CO25S006348_table_header.png"
+  "table_image_path": "io\\fullorder_output\\table_detection\\table\\CO25S006348_main_table.png",
+  "table_header_image_path": "io\\fullorder_output\\table_detection\\table_header\\CO25S006348_table_header.png",
+  "order_header_image_path": "io\\fullorder_output\\table_detection\\order_header\\CO25S006348_order_header.png",
+  "shape_cells": [
+    {
+      "path": "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_1.png",
+      "row_number": 1,
+      "column_position": {
+        "start": 612,
+        "end": 816,
+        "width": 204,
+        "description": "Shape column (צורה)"
+      }
+    },
+    {
+      "path": "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_2.png",
+      "row_number": 2,
+      "column_position": {
+        "start": 612,
+        "end": 816,
+        "width": 204,
+        "description": "Shape column (צורה)"
+      }
+    },
+    {
+      "path": "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_3.png",
+      "row_number": 3,
+      "column_position": {
+        "start": 612,
+        "end": 816,
+        "width": 204,
+        "description": "Shape column (צורה)"
+      }
+    },
+    {
+      "path": "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_4.png",
+      "row_number": 4,
+      "column_position": {
+        "start": 612,
+        "end": 816,
+        "width": 204,
+        "description": "Shape column (צורה)"
+      }
+    },
+    {
+      "path": "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_5.png",
+      "row_number": 5,
+      "column_position": {
+        "start": 612,
+        "end": 816,
+        "width": 204,
+        "description": "Shape column (צורה)"
+      }
+    },
+    {
+      "path": "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_6.png",
+      "row_number": 6,
+      "column_position": {
+        "start": 612,
+        "end": 816,
+        "width": 204,
+        "description": "Shape column (צורה)"
+      }
+    }
+  ],
+  "shape_cell_paths": [
+    "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_1.png",
+    "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_2.png",
+    "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_3.png",
+    "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_4.png",
+    "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_5.png",
+    "io\\fullorder_output\\table_detection\\shapes\\CO25S006348_shape_row_6.png"
+  ]
 }

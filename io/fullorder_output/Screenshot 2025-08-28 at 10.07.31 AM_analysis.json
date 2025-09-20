@@ -1,0 +1,76 @@
+{
+  "file": "Screenshot 2025-08-28 at 10.07.31 AM.png",
+  "file_type": "image",
+  "sections": {
+    "header": {
+      "found": false,
+      "location": "top",
+      "company_name": "",
+      "order_number": "",
+      "date": "",
+      "customer": "",
+      "header_table": {
+        "found": false,
+        "rows": 0,
+        "key_values": []
+      }
+    },
+    "main_table": {
+      "found": false,
+      "location": "middle",
+      "row_count": 0,
+      "columns": [],
+      "contains_iron_orders": false,
+      "all_items": []
+    },
+    "footer": {
+      "found": false,
+      "location": "bottom",
+      "total_amount": "",
+      "terms": "",
+      "signatures": false,
+      "contact_info": ""
+    }
+  },
+  "ocr_data": {
+    "error": "Google Vision not initialized",
+    "text": "",
+    "blocks": []
+  },
+  "analysis": {
+    "document_type": "order_page",
+    "language": "mixed",
+    "sections": {
+      "header": {
+        "found": false,
+        "location": "top",
+        "company_name": "",
+        "order_number": "",
+        "date": "",
+        "customer": "",
+        "header_table": {
+          "found": false,
+          "rows": 0,
+          "key_values": []
+        }
+      },
+      "main_table": {
+        "found": false,
+        "location": "middle",
+        "row_count": 0,
+        "columns": [],
+        "contains_iron_orders": false,
+        "all_items": []
+      },
+      "footer": {
+        "found": false,
+        "location": "bottom",
+        "total_amount": "",
+        "terms": "",
+        "signatures": false,
+        "contact_info": ""
+      }
+    },
+    "summary": "Brief description of the document"
+  }
+}
