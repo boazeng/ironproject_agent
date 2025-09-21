@@ -1,0 +1,61 @@
+{
+  "number_of_rows": 10,
+  "analysis_method": "ChatGPT Vision API",
+  "model_used": "gpt-4o",
+  "input_file": "CO25S006375_table_body_page3.png",
+  "chatgpt_analysis": "The table contains 10 data rows with order information, separated by horizontal grid lines.",
+  "row_coordinates": [
+    {
+      "row_number": 1,
+      "high_y": 50,
+      "low_y": 100
+    },
+    {
+      "row_number": 2,
+      "high_y": 100,
+      "low_y": 150
+    },
+    {
+      "row_number": 3,
+      "high_y": 150,
+      "low_y": 200
+    },
+    {
+      "row_number": 4,
+      "high_y": 200,
+      "low_y": 250
+    },
+    {
+      "row_number": 5,
+      "high_y": 250,
+      "low_y": 300
+    },
+    {
+      "row_number": 6,
+      "high_y": 300,
+      "low_y": 350
+    },
+    {
+      "row_number": 7,
+      "high_y": 350,
+      "low_y": 400
+    },
+    {
+      "row_number": 8,
+      "high_y": 400,
+      "low_y": 450
+    },
+    {
+      "row_number": 9,
+      "high_y": 450,
+      "low_y": 500
+    },
+    {
+      "row_number": 10,
+      "high_y": 500,
+      "low_y": 550
+    }
+  ],
+  "timestamp": "2025-09-20",
+  "agent": "form1s3_2"
+}

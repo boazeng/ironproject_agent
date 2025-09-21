@@ -70,13 +70,7 @@ class OutputCleanerAgent:
                 # Get relative path for logging
                 rel_path = os.path.relpath(root, self.output_dir)
 
-                # Check if we're in a protected subfolder
-                current_folder = os.path.basename(root)
-                if current_folder in self.protected_folders:
-                    # Still process files in protected folders, but note them
-                    logger.info(f"[{self.short_name.upper()}] Processing protected folder: {rel_path}")
-
-                # Process files in current directory
+                # Process files in current directory (no folder protection)
                 for file in files:
                     file_path = os.path.join(root, file)
                     rel_file_path = os.path.relpath(file_path, self.output_dir)

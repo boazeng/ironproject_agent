@@ -1,0 +1,16 @@
+{
+  "number_of_rows": 1,
+  "analysis_method": "ChatGPT Vision API",
+  "model_used": "gpt-4o",
+  "input_file": "CO25S006375_table_body_page2.png",
+  "chatgpt_analysis": "The table contains one data row with order information below the header row.",
+  "row_coordinates": [
+    {
+      "row_number": 1,
+      "high_y": 50,
+      "low_y": 100
+    }
+  ],
+  "timestamp": "2025-09-20",
+  "agent": "form1s3_2"
+}

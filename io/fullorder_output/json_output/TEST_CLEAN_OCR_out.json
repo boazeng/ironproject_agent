@@ -1,0 +1,13 @@
+{
+  "section_1_general": {
+    "order_number": "TEST_CLEAN_OCR",
+    "date_created": "2025-09-21T20:59:26.062010",
+    "date_modified": "2025-09-21T20:59:26.081240"
+  },
+  "section_2_ocr": {
+    "לקוח/פרויקט": "Test Customer",
+    "מס הזמנה": "TEST_CLEAN_OCR",
+    "תאריך הזמנה": "21/01/2025",
+    "סה\"כ משקל": "1000 Kg"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "number_of_rows": 3,
+  "analysis_method": "ChatGPT Vision API",
+  "model_used": "gpt-4o",
+  "input_file": "CO25S006375_table_body_page5.png",
+  "chatgpt_analysis": "The table contains three data rows with order information, separated by horizontal grid lines.",
+  "row_coordinates": [
+    {
+      "row_number": 1,
+      "high_y": 50,
+      "low_y": 150
+    },
+    {
+      "row_number": 2,
+      "high_y": 160,
+      "low_y": 260
+    },
+    {
+      "row_number": 3,
+      "high_y": 270,
+      "low_y": 370
+    }
+  ],
+  "timestamp": "2025-09-20",
+  "agent": "form1s3_2"
+}

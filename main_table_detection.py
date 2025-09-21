@@ -27,6 +27,7 @@ from agents.llm_agents.format1_agent.form1s3_3 import Form1S3_3Agent
 from agents.llm_agents.format1_agent.form1s4 import Form1S4Agent
 from agents.llm_agents.format1_agent.form1s4_1 import Form1S4_1Agent
 from agents.llm_agents.format1_agent.form1s5 import Form1S5Agent
+from agents.llm_agents.format1_agent.form1ocr1 import Form1OCR1Agent
 
 # Configure logging
 logging.basicConfig(
@@ -56,6 +57,7 @@ class TableDetectionPipeline:
             "form1s3_2": None,
             "form1s4": None,
             "form1s5": None,
+            "form1ocr1": None,
             "errors": []
         }
 
@@ -1100,6 +1102,66 @@ class TableDetectionPipeline:
         else:
             print("[WARNING] PIPELINE COMPLETED WITH ERRORS")
 
+    def process_with_form1ocr1(self):
+        """Process order header with Form1OCR1 agent (page 1 only)"""
+        self.print_section("STEP 4: ORDER HEADER OCR PROCESSING")
+
+        try:
+            # Check if order header image from page 1 exists
+            order_header_dir = os.path.join(self.output_dir, "table_detection", "order_header")
+
+            if not os.path.exists(order_header_dir):
+                print("[FORM1OCR1] [ERROR] Order header directory not found")
+                self.results["form1ocr1"] = {"status": "failed", "error": "order_header directory not found"}
+                return False
+
+            # Look for page 1 order header image
+            page1_header_files = glob.glob(os.path.join(order_header_dir, "*_page1_order_header.png"))
+            if not page1_header_files:
+                # Try alternative naming patterns
+                page1_header_files = glob.glob(os.path.join(order_header_dir, "*_order_title_page1_order_header.png"))
+
+            if not page1_header_files:
+                print("[FORM1OCR1] [ERROR] No page 1 order header image found")
+                self.results["form1ocr1"] = {"status": "failed", "error": "no page 1 order header image found"}
+                return False
+
+            page1_header_file = page1_header_files[0]
+            print(f"[FORM1OCR1] Found page 1 order header: {os.path.basename(page1_header_file)}")
+
+            # Initialize and run Form1OCR1 agent
+            print("[FORM1OCR1] Starting OCR processing with ChatGPT...")
+            form1ocr1_agent = Form1OCR1Agent()
+
+            # Process the order header
+            result = form1ocr1_agent.process()
+
+            if result['success']:
+                field_count = result['agent_result']['field_count']
+                print(f"[FORM1OCR1] [SUCCESS] Extracted {field_count} fields from order header")
+                print(f"[FORM1OCR1] OCR output: {result['agent_result']['output_file']}")
+                print(f"[FORM1OCR1] Website analysis file: {result['agent_result']['analysis_file']}")
+
+                self.results["form1ocr1"] = {
+                    "status": "success",
+                    "fields_extracted": field_count,
+                    "output_file": result['agent_result']['output_file'],
+                    "analysis_file": result['agent_result']['analysis_file']
+                }
+                return True
+            else:
+                error_msg = result.get('error', 'Unknown OCR error')
+                print(f"[FORM1OCR1] [ERROR] {error_msg}")
+                self.results["form1ocr1"] = {"status": "failed", "error": error_msg}
+                return False
+
+        except Exception as e:
+            error_msg = f"Failed during Form1OCR1 processing: {str(e)}"
+            print(f"[FORM1OCR1] [ERROR] {error_msg}")
+            self.results["form1ocr1"] = {"status": "failed", "error": error_msg}
+            self.results["errors"].append(error_msg)
+            return False
+
     def run(self, skip_cleaning=False):
         """Run the complete table detection pipeline"""
         self.start_time = datetime.now()
@@ -1133,9 +1195,19 @@ class TableDetectionPipeline:
         # Step 3: Process all pages from order_to_image folder
         self.process_all_pages()
 
+        # Step 4: Run OCR on order header (page 1 only) after all table processing is complete
+        ocr_success = self.process_with_form1ocr1()
+
+        if ocr_success:
+            print()
+            print("[SUCCESS] Form1OCR1 order header OCR completed successfully")
+        else:
+            print()
+            print("[WARNING] Form1OCR1 order header OCR failed, but continuing...")
+
         # Future steps can be added here:
-        # Step 7: Shape analysis
-        # Step 8: Text recognition
+        # Step 5: Shape analysis
+        # Step 6: Text recognition
         # etc.
 
         # Print summary

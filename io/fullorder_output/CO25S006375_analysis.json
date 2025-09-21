@@ -1,0 +1,22 @@
+{
+  "file": "CO25S006375.pdf",
+  "order_header_image_path": "io/fullorder_output/table_detection/order_header/CO25S006375_order_title_page1_order_header.png",
+  "ocr_data": {
+    "לקוח/פרויקט": "גל אריאל - מדרגים דימונה",
+    "איש קשר באתר": "דניאל אוקנין",
+    "טלפון": "508932525",
+    "כתובת האתר": "סרן יובל נח 13-9",
+    "תאריך הזמנה": "empty",
+    "מס הזמנה": "6303",
+    "תאריך אספקה": "מיידי",
+    "שם התוכנית": "ברזל מיוחד ועמודים בקיוע 6 קורות 3",
+    "סה\"כ משקל": "4,233 Kg"
+  },
+  "sections": {
+    "header": {
+      "found": true,
+      "order_number": "6303",
+      "customer": "גל אריאל - מדרגים דימונה"
+    }
+  }
+}

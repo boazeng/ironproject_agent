@@ -14,5 +14,6 @@ Agent Pipeline (7 steps):
 from .form1s1 import Form1S1Agent
 from .order_format1_main import OrderFormat1MainAgent
 from .form1s2 import Form1S2Agent
+from .form1dat1 import Form1Dat1Agent
 
-__all__ = ['Form1S1Agent', 'OrderFormat1MainAgent', 'Form1S2Agent']
+__all__ = ['Form1S1Agent', 'OrderFormat1MainAgent', 'Form1S2Agent', 'Form1Dat1Agent']

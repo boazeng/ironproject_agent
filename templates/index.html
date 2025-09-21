@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- CACHE BUST: 2025-09-21-21:53 -->
     <title>מערכת ניתוח הזמנות ברזל - IRONMAN</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -106,6 +107,10 @@
                             <span class="btn-icon">🔄</span>
                             זיהוי מחדש
                         </button>
+                        <button id="run-ocr-btn" class="btn btn-small btn-secondary">
+                            <span class="btn-icon">🔍</span>
+                            OCR חכם
+                        </button>
                     </div>
                 </div>
                 <div class="data-tabs">
@@ -118,6 +123,20 @@
             
             <!-- Header Tab Content -->
             <div id="header-tab" class="tab-content active">
+                <!-- Order Header Image Section - MOVED TO TOP -->
+                <div class="header-image-section" id="header-image-section" style="display: block !important; visibility: visible !important; border: 2px solid red; background-color: yellow; padding: 20px; margin: 20px 0;">
+                    <div class="section-header">
+                        <h4>🖼️ תמונת כותרת הזמנה מעמוד 1 🖼️</h4>
+                    </div>
+                    <div class="header-image-container">
+                        <img id="order-header-image" src="/order_header_image/CO25S006375_order_title_page1_order_header.png" alt="תמונת כותרת הזמנה" class="header-image" style="display: block;" />
+                        <div id="no-header-image" class="placeholder" style="display: none;">
+                            <p>📋 אין תמונת כותרת זמינה</p>
+                            <p>הרץ ניתוח כדי לזהות כותרת מהמסמך</p>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="data-section">
                     <div class="data-grid" id="header-data">
                         <div class="data-row">
@@ -148,19 +167,17 @@
                             <span class="data-label">משקל כולל:</span>
                             <input class="data-editable" id="detail-weight" type="text" placeholder="-" data-field="weight">
                         </div>
+                        <div class="data-row">
+                            <span class="data-label">תאריך הזמנה:</span>
+                            <input class="data-editable" id="detail-order-date" type="text" placeholder="-" data-field="orderDate">
+                        </div>
+                        <div class="data-row">
+                            <span class="data-label">תאריך אספקה:</span>
+                            <input class="data-editable" id="detail-delivery-date" type="text" placeholder="-" data-field="deliveryDate">
+                        </div>
                     </div>
                     <div class="auto-save-info">
                         <span id="save-status"></span>
-                    </div>
-                    
-                    <!-- Order Header Image Section -->
-                    <div class="header-image-section" id="header-image-section" style="display: none;">
-                        <div class="section-header">
-                            <h4>תמונת הכותרת</h4>
-                        </div>
-                        <div class="header-image-container">
-                            <img id="order-header-image" src="" alt="תמונת כותרת הזמנה" class="header-image" />
-                        </div>
                     </div>
                 </div>
             </div>

@@ -4,6 +4,8 @@ import fitz  # PyMuPDF
 from PIL import Image
 import json
 from pathlib import Path
+from datetime import datetime
+from .form1dat1 import Form1Dat1Agent
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,9 @@ class Form1S1Agent:
         self.order_to_image_dir = "io/fullorder_output/order_to_image"
         self.original_order_dir = "io/fullorder_output/original_order"
         logger.info(f"[{self.short_name.upper()}] Agent initialized - Format 1 Step 1 processor")
+
+        # Initialize form1dat1 agent for data storage
+        self.form1dat1 = Form1Dat1Agent()
 
         # Create output directories if they don't exist
         os.makedirs(self.output_dir, exist_ok=True)
@@ -166,6 +171,16 @@ class Form1S1Agent:
                 result["original_file_path"] = original_file_path
                 result["original_order_dir"] = self.original_order_dir
                 result["message"] = f"Successfully extracted all {total_pages} pages from {file_name}"
+
+                # Initialize order in form1dat1 database and update Section 1 with general data
+                self.form1dat1.initialize_order(order_name)
+                general_data = {
+                    "order_name": order_name,
+                    "order_create_date": datetime.now().isoformat(),
+                    "number_of_pages": total_pages
+                }
+                self.form1dat1.update_section(order_name, "section_1_general", general_data, merge=True)
+                logger.info(f"[{self.short_name.upper()}] General data stored in form1dat1 database")
 
                 # JSON result file creation disabled
                 # logger.info(f"[{self.short_name.upper()}] Results saved to: {json_output_path}")

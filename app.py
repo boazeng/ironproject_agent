@@ -11,6 +11,7 @@ import threading
 from datetime import datetime
 import glob
 import io
+import sys
 
 # Import the OrderHeader agent
 from agents.llm_agents.orderheader_agent import OrderHeaderAgent
@@ -20,6 +21,7 @@ CORS(app)
 
 # Configuration
 app.config['SECRET_KEY'] = 'ironman-order-analysis-2024'
+app.config['TEMPLATES_AUTO_RELOAD'] = True
 OUTPUT_DIR = 'io/fullorder_output'
 PDF_DIR = 'io/fullorder'
 INPUT_DIR = 'io/input'
@@ -37,86 +39,100 @@ def index():
     """Serve the main page"""
     return render_template('index.html')
 
+@app.route('/test')
+def test():
+    """Test template route"""
+    return render_template('test.html')
+
 @app.route('/api/run-analysis', methods=['POST'])
 def run_analysis():
     """Run the main_global.py analysis script"""
     global analysis_status
-    
+
+    print(f"[DEBUG] /api/run-analysis endpoint called")
+
     if analysis_status['running']:
+        print(f"[DEBUG] Analysis already running, returning error")
         return jsonify({
             'success': False,
             'error': 'Analysis already running'
         })
-    
+
     # Get the selected filename from request
     data = request.get_json() or {}
     selected_file = data.get('filename', '')
+    print(f"[DEBUG] Request data: {data}")
+    print(f"[DEBUG] Selected file: {selected_file}")
     
     def run_script():
         global analysis_status
         try:
+            print(f"[DEBUG] Starting run_script function")
+            print(f"[DEBUG] Selected file: {selected_file}")
+
             analysis_status['running'] = True
             analysis_status['error'] = None
-            
-            # Clean up previous analysis files in table_detection subfolders
-            cleanup_folders = [
-                'shapes',
-                'order_header', 
-                'table',
-                'table_header',
-                'shape_column'
-            ]
-            
-            for folder in cleanup_folders:
-                folder_path = os.path.join(OUTPUT_DIR, 'table_detection', folder)
-                if os.path.exists(folder_path):
-                    for filename in os.listdir(folder_path):
-                        file_path = os.path.join(folder_path, filename)
-                        if os.path.isfile(file_path):
-                            try:
-                                os.remove(file_path)
-                                print(f"Deleted: {file_path}")
-                            except Exception as e:
-                                print(f"Error deleting {file_path}: {e}")
-                    print(f"Cleaned up folder: {folder_path}")
-            
-            # Run the main_global.py script with optional filename parameter
-            cmd = ['python', 'main_global.py']
-            if selected_file:
-                cmd.append(selected_file)
-            
+
+            # Run the main_table_detection.py script (doesn't accept filename arguments)
+            cmd = ['python', 'main_table_detection.py', '--skip-clean']
+
+            print(f"[DEBUG] Running command: {' '.join(cmd)}")
+            print(f"[DEBUG] Current working directory: {os.getcwd()}")
+            print(f"[DEBUG] Python executable: {sys.executable}")
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
                 text=True,
-                encoding='utf-8'
+                encoding='utf-8',
+                cwd=os.getcwd()
             )
-            
+
+            print(f"[DEBUG] Command return code: {result.returncode}")
+            print(f"[DEBUG] Command stdout length: {len(result.stdout)}")
+            print(f"[DEBUG] Command stderr length: {len(result.stderr)}")
+
+            if result.stdout:
+                print(f"[DEBUG] Command stdout: {result.stdout[:500]}...")
+            if result.stderr:
+                print(f"[DEBUG] Command stderr: {result.stderr[:500]}...")
+
             analysis_status['last_run'] = datetime.now().isoformat()
-            
+
             if result.returncode == 0:
                 analysis_status['last_result'] = 'success'
-                print("Analysis completed successfully")
+                print("[DEBUG] Analysis completed successfully")
             else:
                 analysis_status['last_result'] = 'error'
                 analysis_status['error'] = result.stderr
-                print(f"Analysis failed: {result.stderr}")
-                
+                print(f"[DEBUG] Analysis failed: {result.stderr}")
+
         except Exception as e:
             analysis_status['last_result'] = 'error'
             analysis_status['error'] = str(e)
-            print(f"Error running analysis: {e}")
+            print(f"[DEBUG] Error running analysis: {e}")
+            import traceback
+            print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         finally:
             analysis_status['running'] = False
+            print(f"[DEBUG] run_script function completed")
     
     # Run in background thread
+    print(f"[DEBUG] Creating background thread")
     thread = threading.Thread(target=run_script)
+    print(f"[DEBUG] Starting background thread")
     thread.start()
-    
+    print(f"[DEBUG] Background thread started, returning response")
+
     return jsonify({
         'success': True,
         'message': 'Analysis started'
     })
+
+@app.route('/api/analysis-status')
+def get_analysis_status():
+    """Get the current analysis status"""
+    return jsonify(analysis_status)
 
 @app.route('/api/latest-analysis')
 def get_latest_analysis():
@@ -818,16 +834,64 @@ def redetect_shapes():
             'error': f'Shape re-detection failed: {str(e)}'
         })
 
+@app.route('/api/run-ocr-analysis', methods=['POST'])
+def run_ocr_analysis():
+    """Run the form1ocr1 agent to perform OCR on order header"""
+    try:
+        # Import the OCR agent
+        from agents.llm_agents.format1_agent.form1ocr1 import Form1OCR1Agent
+
+        # Create and run the agent
+        agent = Form1OCR1Agent()
+        result = agent.process()
+
+        if result['success']:
+            # Update the analysis file with OCR data
+            analysis_files = glob.glob(os.path.join(OUTPUT_DIR, '*_analysis.json'))
+
+            if analysis_files:
+                latest_file = max(analysis_files, key=os.path.getmtime)
+
+                # Load existing data
+                with open(latest_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+
+                # Add OCR data
+                data['ocr_data'] = result['agent_result']['extracted_fields']
+
+                # Save updated data
+                with open(latest_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+
+            return jsonify({
+                'success': True,
+                'agent_result': result['agent_result'],
+                'message': 'OCR analysis completed successfully'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'OCR analysis failed')
+            })
+
+    except Exception as e:
+        print(f"[DEBUG] OCR analysis error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'OCR analysis failed: {str(e)}'
+        })
+
 if __name__ == '__main__':
     # Create necessary directories
     os.makedirs('templates', exist_ok=True)
     os.makedirs('static/css', exist_ok=True)
     os.makedirs('static/js', exist_ok=True)
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    
+
     print("IRONMAN Web Interface Starting...")
     print("Navigate to: http://localhost:5000")
     print("Press Ctrl+C to stop the server")
-    
-    # Run the Flask app
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("[DEBUG] UPDATED CODE LOADED - Version with debug logging")
+
+    # Run the Flask app with template auto-reload enabled
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=True)

@@ -1,4 +1,4 @@
-// Global variables
+// Global variables - CACHE BUST: 2025-09-21-22:03 - REMOVED YELLOW BACKGROUND
 let pdfDoc = null;
 let pageNum = 1;
 let pageRendering = false;
@@ -41,12 +41,18 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load initial data if available
     loadLatestAnalysis();
-    
+
     // Update timestamp
     updateLastUpdateTime();
-    
+
     // Initialize button visibility
     updateClearButtonVisibility();
+
+    // FORCE SHOW ORDER HEADER SECTION FOR TESTING
+    setTimeout(() => {
+        console.log('🚀 FORCING ORDER HEADER SECTION TO SHOW...');
+        showOrderHeaderSection('/order_header_image/CO25S006375_order_title_page1_order_header.png');
+    }, 1000);
 });
 
 // Setup all event listeners
@@ -85,6 +91,11 @@ function setupEventListeners() {
     document.getElementById('clear-header-btn').addEventListener('click', clearHeaderData);
     document.getElementById('redetect-header-btn').addEventListener('click', redetectHeader);
 
+    const ocrBtn = document.getElementById('run-ocr-btn');
+    if (ocrBtn) {
+        ocrBtn.addEventListener('click', runOCRAnalysis);
+    }
+
     // Shapes re-detect button
     document.getElementById('redetect-shapes-btn').addEventListener('click', redetectShapes);
 
@@ -106,7 +117,7 @@ async function runAnalysis() {
     runBtn.innerHTML = '<span class="loading"></span> מעבד...';
     status.textContent = 'מעבד';
     status.className = 'value status-processing';
-    processingStatus.textContent = 'מריץ ניתוח GLOBAL...';
+    processingStatus.textContent = 'מריץ זיהוי טבלה...';
     
     try {
         // Prepare request body with selected filename
@@ -125,17 +136,11 @@ async function runAnalysis() {
         });
         
         const result = await response.json();
-        
+
         if (result.success) {
-            // Analysis completed successfully
-            status.textContent = 'הושלם';
-            status.className = 'value status-ready';
-            processingStatus.textContent = 'הניתוח הושלם בהצלחה';
-            
-            // Load the new data
-            setTimeout(() => {
-                loadLatestAnalysis();
-            }, 1000);
+            // Analysis started, now poll for completion
+            processingStatus.textContent = 'מריץ זיהוי טבלה... אנא המתן';
+            pollForCompletion();
         } else {
             // Error occurred
             throw new Error(result.error || 'שגיאה בהרצת הניתוח');
@@ -145,16 +150,67 @@ async function runAnalysis() {
         status.textContent = 'שגיאה';
         status.className = 'value status-error';
         processingStatus.textContent = `שגיאה: ${error.message}`;
-    } finally {
-        // Reset button
-        runBtn.disabled = false;
-        runBtn.innerHTML = '<span class="btn-icon">▶</span> הרץ ניתוח';
-        
-        // Clear status after 5 seconds
-        setTimeout(() => {
-            processingStatus.textContent = '';
-        }, 5000);
+
+        // Reset button on error
+        resetAnalysisButton();
     }
+}
+
+function pollForCompletion() {
+    const checkStatus = async () => {
+        try {
+            const response = await fetch('/api/analysis-status');
+            const statusData = await response.json();
+
+            if (!statusData.running) {
+                // Analysis completed
+                if (statusData.last_result === 'success') {
+                    // Success
+                    const status = document.getElementById('status');
+                    const processingStatus = document.getElementById('processing-status');
+
+                    status.textContent = 'הושלם';
+                    status.className = 'value status-ready';
+                    processingStatus.textContent = 'זיהוי הטבלה הושלם בהצלחה!';
+
+                    // Load the new data
+                    setTimeout(() => {
+                        loadLatestAnalysis();
+                    }, 1000);
+                } else if (statusData.last_result === 'error') {
+                    // Error
+                    const status = document.getElementById('status');
+                    const processingStatus = document.getElementById('processing-status');
+
+                    status.textContent = 'שגיאה';
+                    status.className = 'value status-error';
+                    processingStatus.textContent = `שגיאה: ${statusData.error || 'שגיאה לא ידועה'}`;
+                }
+
+                // Reset button
+                resetAnalysisButton();
+
+                // Clear status after 5 seconds
+                setTimeout(() => {
+                    document.getElementById('processing-status').textContent = '';
+                }, 5000);
+            } else {
+                // Still running, check again in 1 second
+                setTimeout(checkStatus, 1000);
+            }
+        } catch (error) {
+            console.error('Error checking status:', error);
+            resetAnalysisButton();
+        }
+    };
+
+    checkStatus();
+}
+
+function resetAnalysisButton() {
+    const runBtn = document.getElementById('run-analysis');
+    runBtn.disabled = false;
+    runBtn.innerHTML = '<span class="btn-icon">▶</span> הרץ ניתוח';
 }
 
 // Load latest analysis results
@@ -237,33 +293,89 @@ function displayAnalysisData(data) {
                     });
                 });
             }
+        }
+
+        // Process OCR data if available (prioritize over header data)
+        if (data.ocr_data) {
+            console.log('Processing OCR data:', data.ocr_data);
+            const ocrData = data.ocr_data;
+
+            // Map OCR fields to form fields
+            if (ocrData['לקוח/פרויקט'] && ocrData['לקוח/פרויקט'] !== 'empty') {
+                document.getElementById('detail-customer').value = ocrData['לקוח/פרויקט'];
+                document.getElementById('customer-name').textContent = ocrData['לקוח/פרויקט'];
+            }
+            if (ocrData['איש קשר באתר'] && ocrData['איש קשר באתר'] !== 'empty') {
+                document.getElementById('detail-contact').value = ocrData['איש קשר באתר'];
+            }
+            if (ocrData['טלפון'] && ocrData['טלפון'] !== 'empty') {
+                document.getElementById('detail-phone').value = ocrData['טלפון'];
+            }
+            if (ocrData['כתובת האתר'] && ocrData['כתובת האתר'] !== 'empty') {
+                document.getElementById('detail-address').value = ocrData['כתובת האתר'];
+            }
+            if (ocrData['מס הזמנה'] && ocrData['מס הזמנה'] !== 'empty') {
+                document.getElementById('detail-order-number').value = ocrData['מס הזמנה'];
+                document.getElementById('order-number').textContent = ocrData['מס הזמנה'];
+            }
+            if (ocrData['שם התוכנית'] && ocrData['שם התוכנית'] !== 'empty') {
+                document.getElementById('detail-program-name').value = ocrData['שם התוכנית'];
+            }
+            if (ocrData['סה"כ משקל'] && ocrData['סה"כ משקל'] !== 'empty') {
+                document.getElementById('detail-weight').value = ocrData['סה"כ משקל'];
+            }
+            if (ocrData['תאריך הזמנה'] && ocrData['תאריך הזמנה'] !== 'empty') {
+                document.getElementById('detail-order-date').value = ocrData['תאריך הזמנה'];
+            }
+            if (ocrData['תאריך אספקה'] && ocrData['תאריך אספקה'] !== 'empty') {
+                document.getElementById('detail-delivery-date').value = ocrData['תאריך אספקה'];
+            }
+
+            console.log('OCR data has been populated to form fields');
+
+            // Show the order header image section when OCR data is loaded
+            showOrderHeaderSection();
+        }
             
             // Display order header image if available
-            const headerImageSection = document.getElementById('header-image-section');
             const headerImage = document.getElementById('order-header-image');
-            
+            const noHeaderImage = document.getElementById('no-header-image');
+
             if (data.order_header_image_path) {
                 // Extract filename from full path
                 const filename = data.order_header_image_path.split(/[\\\/]/).pop();
                 const imageUrl = `/order_header_image/${filename}`;
-                
+
+                console.log('🔍 DEBUG: Found order_header_image_path:', data.order_header_image_path);
+                console.log('🔍 DEBUG: Extracted filename:', filename);
+                console.log('🔍 DEBUG: Image URL:', imageUrl);
+
+                // Show the order header section when image path is available
+                showOrderHeaderSection(imageUrl);
+
                 headerImage.onerror = function() {
-                    console.error('Failed to load header image:', imageUrl);
+                    console.error('❌ Failed to load header image:', imageUrl);
+                    // Show placeholder if image fails to load
+                    headerImage.style.display = 'none';
+                    noHeaderImage.style.display = 'block';
                 };
-                
+
                 headerImage.onload = function() {
-                    console.log('Successfully loaded header image:', filename);
+                    console.log('✅ Successfully loaded header image:', filename);
+                    // Show image and hide placeholder
+                    headerImage.style.display = 'block';
+                    noHeaderImage.style.display = 'none';
                 };
-                
+
                 headerImage.src = imageUrl;
-                headerImageSection.style.display = 'block';
-                console.log('Setting header image src:', imageUrl);
+                console.log('🔍 DEBUG: Setting header image src:', imageUrl);
             } else {
-                headerImageSection.style.display = 'none';
+                // No image available - show placeholder
+                headerImage.style.display = 'none';
+                noHeaderImage.style.display = 'block';
                 console.log('No header image path found in data');
             }
-        }
-        
+
         // Table section
         if (sections.main_table && sections.main_table.found) {
             const table = sections.main_table;
@@ -325,7 +437,7 @@ function displayAnalysisData(data) {
             }
         }
     }
-    
+
     // Shapes section
     displayShapes(data);
     
@@ -635,6 +747,8 @@ function clearHeaderData() {
     document.getElementById('detail-phone').value = '';
     document.getElementById('detail-address').value = '';
     document.getElementById('detail-weight').value = '';
+    document.getElementById('detail-order-date').value = '';
+    document.getElementById('detail-delivery-date').value = '';
     
     // Clear header info at top
     document.getElementById('order-number').textContent = '-';
@@ -771,6 +885,61 @@ async function redetectHeader() {
         // Reset button
         redetectBtn.disabled = false;
         redetectBtn.innerHTML = originalContent;
+    }
+}
+
+async function runOCRAnalysis() {
+    const ocrBtn = document.getElementById('run-ocr-btn');
+    const originalContent = ocrBtn.innerHTML;
+
+    try {
+        // Update button to show processing
+        ocrBtn.disabled = true;
+        ocrBtn.innerHTML = '<span class="btn-icon">⏳</span>מפעיל OCR...';
+
+        // Show processing status
+        document.getElementById('processing-status').textContent = 'מפעיל OCR חכם על כותרת ההזמנה...';
+
+        // Call the OCR analysis API
+        const response = await fetch('/api/run-ocr-analysis', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            const fieldCount = result.agent_result.field_count;
+            document.getElementById('processing-status').textContent =
+                `OCR הושלם בהצלחה! נמצאו ${fieldCount} שדות. טוען נתונים...`;
+
+            // Reload the latest analysis data to show the OCR results
+            setTimeout(() => {
+                loadLatestAnalysis();
+                document.getElementById('processing-status').textContent = 'נתוני OCR נטענו בהצלחה!';
+            }, 1000);
+
+        } else {
+            throw new Error(result.error || 'OCR analysis failed');
+        }
+
+        // Clear status after delay
+        setTimeout(() => {
+            document.getElementById('processing-status').textContent = '';
+        }, 4000);
+
+    } catch (error) {
+        console.error('Error in OCR analysis:', error);
+        document.getElementById('processing-status').textContent = `שגיאה ב-OCR: ${error.message}`;
+        setTimeout(() => {
+            document.getElementById('processing-status').textContent = '';
+        }, 5000);
+    } finally {
+        // Reset button
+        ocrBtn.disabled = false;
+        ocrBtn.innerHTML = originalContent;
     }
 }
 
@@ -1836,5 +2005,74 @@ function updateSelectionCanvasSize() {
                 position: { left: selectionCanvas.style.left, top: selectionCanvas.style.top }
             });
         }
+    }
+}
+
+// Function to dynamically show the order header section
+function showOrderHeaderSection(imageUrl = null) {
+    console.log('🖼️ Showing order header section...', imageUrl ? `with image: ${imageUrl}` : '');
+
+    // Try to find the order header section by different possible IDs/classes
+    let headerSection = document.getElementById('header-image-section');
+
+    if (headerSection) {
+        // Force show the section
+        headerSection.style.display = 'block';
+        headerSection.style.visibility = 'visible';
+        headerSection.style.padding = '20px';
+        headerSection.style.margin = '20px 0';
+
+        console.log('✅ Order header section is now visible!');
+
+        // Update the section title
+        const sectionTitle = headerSection.querySelector('h4');
+        if (sectionTitle) {
+            sectionTitle.textContent = 'תמונת כותרת הזמנה מעמוד 1';
+        }
+
+        // Update image if URL provided
+        if (imageUrl) {
+            const headerImage = headerSection.querySelector('#order-header-image');
+            if (headerImage) {
+                headerImage.src = imageUrl;
+                headerImage.style.display = 'block';
+                console.log('✅ Image source updated to:', imageUrl);
+            }
+        }
+    } else {
+        console.log('❌ Order header section not found in DOM');
+
+        // If section doesn't exist, create it dynamically
+        createOrderHeaderSection(imageUrl);
+    }
+}
+
+// Function to create the order header section if it doesn't exist
+function createOrderHeaderSection(imageUrl = null) {
+    console.log('🔨 Creating order header section dynamically...', imageUrl ? `with image: ${imageUrl}` : '');
+
+    const headerTab = document.getElementById('header-tab');
+    if (headerTab) {
+        const defaultImageSrc = imageUrl || '/order_header_image/CO25S006375_order_title_page1_order_header.png';
+        const headerHTML = `
+            <div class="header-image-section" id="header-image-section" style="display: block; visibility: visible; padding: 20px; margin: 20px 0;">
+                <div class="section-header">
+                    <h4>תמונת כותרת הזמנה מעמוד 1</h4>
+                </div>
+                <div class="header-image-container">
+                    <img id="order-header-image" src="${defaultImageSrc}" alt="תמונת כותרת הזמנה" class="header-image" style="display: block;" />
+                    <div id="no-header-image" class="placeholder" style="display: none;">
+                        <p>📋 אין תמונת כותרת זמינה</p>
+                        <p>הרץ ניתוח כדי לזהות כותרת מהמסמך</p>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Insert at the beginning of the header tab
+        headerTab.insertAdjacentHTML('afterbegin', headerHTML);
+        console.log('✅ Order header section created successfully with image:', defaultImageSrc);
+    } else {
+        console.log('❌ Header tab not found, cannot create section');
     }
 }

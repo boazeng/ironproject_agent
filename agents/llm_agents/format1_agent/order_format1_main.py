@@ -220,23 +220,10 @@ class OrderFormat1MainAgent:
         return summary
 
     def save_results(self, result):
-        """Save processing results to JSON file"""
-        try:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_file = os.path.join(
-                self.output_dir,
-                f"format1_processing_results_{timestamp}.json"
-            )
-
-            os.makedirs(self.output_dir, exist_ok=True)
-
-            with open(output_file, 'w', encoding='utf-8') as f:
-                json.dump(result, f, indent=2, ensure_ascii=False)
-
-            logger.info(f"[{self.short_name.upper()}] Results saved to: {output_file}")
-
-        except Exception as e:
-            logger.error(f"[{self.short_name.upper()}] Failed to save results: {str(e)}")
+        """Save processing results to JSON file - DISABLED"""
+        # JSON file creation disabled - no longer saving format1_processing_results file
+        logger.info(f"[{self.short_name.upper()}] JSON result file creation skipped (disabled)")
+        return
 
     def get_processing_status(self):
         """Get current processing status"""
