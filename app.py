@@ -15,9 +15,15 @@ import sys
 
 # Import the OrderHeader agent
 from agents.llm_agents.orderheader_agent import OrderHeaderAgent
+# Import the Form1Dat1 agent for database management
+from agents.llm_agents.format1_agent.form1dat1 import Form1Dat1Agent
 
 app = Flask(__name__)
 CORS(app)
+
+# Disable template caching for development
+app.config['TEMPLATES_AUTO_RELOAD'] = True
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 # Configuration
 app.config['SECRET_KEY'] = 'ironman-order-analysis-2024'
@@ -33,6 +39,9 @@ analysis_status = {
     'last_result': None,
     'error': None
 }
+
+# Initialize Form1Dat1 agent for database management
+form1dat1_agent = Form1Dat1Agent()
 
 @app.route('/')
 def index():
@@ -881,7 +890,307 @@ def run_ocr_analysis():
             'error': f'OCR analysis failed: {str(e)}'
         })
 
-if __name__ == '__main__':
+def get_latest_analysis_file():
+    """Helper function to get the latest analysis file"""
+    try:
+        analysis_files = glob.glob(os.path.join(OUTPUT_DIR, '*_analysis.json'))
+        if not analysis_files:
+            return None
+        return max(analysis_files, key=os.path.getmtime)
+    except:
+        return None
+
+@app.route('/api/update-table-cell', methods=['POST'])
+def update_table_cell():
+    """Update a single table cell value and save to database"""
+    try:
+        data = request.json
+        order_number = data.get('orderNumber')
+        page_number = data.get('pageNumber')
+        row_index = data.get('rowIndex')
+        field_name = data.get('fieldName')
+        new_value = data.get('value')
+
+        try:
+            print(f"[DEBUG] Updating table cell: Order {order_number}, Page {page_number}, Row {row_index}, Field {field_name} = {new_value}")
+        except UnicodeEncodeError:
+            print(f"[DEBUG] Updating table cell: Order {order_number}, Page {page_number}, Row {row_index}, Field [Hebrew], Value [Hebrew]")
+
+        # First update the OCR file (keep original functionality)
+        ocr_file_path = os.path.join(
+            OUTPUT_DIR,
+            'table_detection',
+            'Table_ocr',
+            f'{order_number}_table_ocr_page{page_number}.json'
+        )
+
+        if not os.path.exists(ocr_file_path):
+            return jsonify({
+                'success': False,
+                'error': 'OCR file not found'
+            })
+
+        # Load and update OCR data
+        with open(ocr_file_path, 'r', encoding='utf-8') as f:
+            ocr_data = json.load(f)
+
+        if 'table_data' in ocr_data and 'rows' in ocr_data['table_data']:
+            if row_index < len(ocr_data['table_data']['rows']):
+                # Map field names to the correct keys in the data
+                field_mapping = {
+                    'מס': 'מס',
+                    'shape': 'shape',
+                    'קוטר': 'קוטר',
+                    'סהכ יחידות': 'סהכ יחידות',
+                    'אורך': 'אורך',
+                    'משקל': 'משקל',
+                    'הערות': 'הערות'
+                }
+                mapped_field = field_mapping.get(field_name, field_name)
+                ocr_data['table_data']['rows'][row_index][mapped_field] = new_value
+
+                # Save the updated OCR data back to file
+                with open(ocr_file_path, 'w', encoding='utf-8') as f:
+                    json.dump(ocr_data, f, ensure_ascii=False, indent=2)
+
+                # Now save to database using form1dat1 agent (Section 3 format)
+                line_number = row_index + 1  # Lines are 1-indexed
+                save_to_database_section3(order_number, page_number, line_number, ocr_data['table_data']['rows'][row_index])
+
+                print(f"[DEBUG] Successfully updated table cell and saved to database")
+                return jsonify({
+                    'success': True,
+                    'message': 'Cell updated and saved to database successfully'
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': 'Invalid row index'
+                })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Invalid OCR data structure'
+            })
+    except Exception as e:
+        try:
+            print(f"[DEBUG] Error updating table cell: {e}")
+        except UnicodeEncodeError:
+            print(f"[DEBUG] Error updating table cell: [Unicode encoding error]")
+        try:
+            error_msg = str(e)
+        except UnicodeEncodeError:
+            error_msg = "Unicode encoding error in exception message"
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        })
+
+@app.route('/api/table-ocr/<string:page_number>')
+def get_table_ocr_data(page_number):
+    """Get table data for a specific page from the database"""
+    try:
+        # Get the current order number from the latest analysis
+        latest_file = get_latest_analysis_file()
+        if not latest_file:
+            return jsonify({
+                'success': False,
+                'error': 'No analysis file found'
+            })
+
+        # Extract order number from filename
+        order_number = os.path.basename(latest_file).replace('_analysis.json', '')
+
+        print(f"[DEBUG] Getting table data from database for order {order_number}, page {page_number}")
+
+        # Get data from database Section 3
+        section3_data = form1dat1_agent.get_section_data(order_number, "section_3_shape_analysis")
+
+        if not section3_data:
+            return jsonify({
+                'success': False,
+                'error': f'No database data found for order {order_number}',
+                'page_number': page_number
+            })
+
+        # Look for the specific page
+        page_key = f"page_{page_number}"
+        if page_key not in section3_data:
+            return jsonify({
+                'success': False,
+                'error': f'No data found for page {page_number}',
+                'page_number': page_number
+            })
+
+        page_data = section3_data[page_key]
+        order_lines = page_data.get('order_lines', {})
+
+        # Convert database format to the format expected by the frontend
+        rows = []
+        for line_key in sorted(order_lines.keys(), key=lambda x: int(x.split('_')[1])):
+            line_data = order_lines[line_key]
+
+            # Map database fields to the format expected by frontend
+            row = {
+                'row_number': line_data.get('line_number', 0),
+                'מס': line_data.get('order_line_no', ''),
+                'shape': line_data.get('shape_number', ''),
+                'קוטר': line_data.get('diameter', ''),
+                'סהכ יחידות': str(line_data.get('number_of_units', 0)),
+                'אורך': line_data.get('length', ''),  # Length from database
+                'משקל': line_data.get('weight', ''),  # Weight from database
+                'הערות': line_data.get('notes', ''),  # Notes from database
+                'checked': line_data.get('checked', False)  # Checked status from database
+            }
+            rows.append(row)
+
+        # Create table_data structure compatible with frontend
+        table_data = {
+            'format': 'format 1',
+            'page_number': page_number,
+            'total_rows': len(rows),
+            'rows': rows
+        }
+
+        print(f"[DEBUG] Retrieved {len(rows)} rows from database for page {page_number}")
+
+        return jsonify({
+            'success': True,
+            'page_number': page_number,
+            'order_number': order_number,
+            'table_data': table_data,
+            'total_rows': len(rows),
+            'rows': rows
+        })
+
+    except Exception as e:
+        print(f"[DEBUG] Table data error for page {page_number}: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to load table data: {str(e)}',
+            'page_number': page_number
+        })
+
+def save_to_database_section3(order_number, page_number, line_number, row_data):
+    """
+    Save row data to Section 3 of the database using form1dat1 agent
+    Follows the database structure defined in readme_database_structure.txt
+    """
+    try:
+        # Initialize order if it doesn't exist
+        form1dat1_agent.initialize_order(order_number)
+
+        # Get current Section 3 data or create new structure
+        current_section3 = form1dat1_agent.get_section_data(order_number, "section_3_shape_analysis") or {}
+
+        # Create page structure if it doesn't exist
+        page_key = f"page_{page_number}"
+        if page_key not in current_section3:
+            current_section3[page_key] = {
+                "page_number": int(page_number),
+                "number_of_order_lines": 0,
+                "order_lines": {}
+            }
+
+        # Create line structure and populate data
+        line_key = f"line_{line_number}"
+        # Get existing line data to preserve checked status
+        existing_line = current_section3[page_key]["order_lines"].get(line_key, {})
+
+        current_section3[page_key]["order_lines"][line_key] = {
+            "line_number": line_number,
+            "order_line_no": row_data.get('מס', ''),
+            "shape_number": row_data.get('shape', ''),
+            "number_of_ribs": 0,  # Default, can be updated later
+            "diameter": row_data.get('קוטר', ''),
+            "number_of_units": int(row_data.get('סהכ יחידות', 0)) if row_data.get('סהכ יחידות', '').isdigit() else 0,
+            "length": row_data.get('אורך', ''),  # Length field
+            "weight": row_data.get('משקל', ''),  # Weight field
+            "notes": row_data.get('הערות', ''),  # Notes field
+            "checked": existing_line.get('checked', False),  # Preserve existing checked status or default to False
+            "ribs": {}  # Will be populated when shape analysis is available
+        }
+
+        # Update the number of order lines for this page
+        current_section3[page_key]["number_of_order_lines"] = len(current_section3[page_key]["order_lines"])
+
+        # Save to database
+        success = form1dat1_agent.update_section(order_number, "section_3_shape_analysis", current_section3, merge=False)
+
+        if success:
+            print(f"[OK] Saved to database: Order {order_number}, Page {page_number}, Line {line_number}")
+        else:
+            print(f"[ERROR] Failed to save to database")
+
+        return success
+
+    except Exception as e:
+        try:
+            print(f"[ERROR] Error saving to database Section 3: {str(e)}")
+        except UnicodeEncodeError:
+            print(f"[ERROR] Error saving to database Section 3: [Unicode encoding error]")
+        return False
+
+@app.route('/api/update-checked-status', methods=['POST'])
+def update_checked_status():
+    """Update the checked status for a specific line and save complete line data from screen"""
+    try:
+        data = request.json
+        order_number = data.get('orderNumber')
+        page_number = data.get('pageNumber')
+        line_number = data.get('lineNumber')
+        checked = data.get('checked')
+        row_data_from_screen = data.get('rowData', {})
+
+        print(f"[DEBUG] Updating checked status: Order {order_number}, Page {page_number}, Line {line_number}, Checked: {checked}")
+        try:
+            print(f"[DEBUG] Screen data: {row_data_from_screen}")
+        except UnicodeEncodeError:
+            print(f"[DEBUG] Screen data: [Hebrew data with {len(row_data_from_screen)} fields]")
+
+        # Save the complete line data from screen to database
+        row_data_saved = False
+        if row_data_from_screen:
+            # Save the complete line data from screen to database
+            save_success = save_to_database_section3(order_number, page_number, line_number, row_data_from_screen)
+
+            if save_success:
+                print(f"[OK] Saved complete line data from screen for line {line_number} on page {page_number} (checked={checked})")
+                row_data_saved = True
+            else:
+                print(f"[WARNING] Could not save complete line data for line {line_number}")
+        else:
+            print(f"[WARNING] No row data received from screen for line {line_number}")
+
+        # Update the checked status
+        success = form1dat1_agent.update_line_checked_status(order_number, page_number, line_number, checked)
+
+        if success:
+            return jsonify({
+                'success': True,
+                'message': f'Line {line_number} on page {page_number} marked as {"checked" if checked else "unchecked"} and data saved'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to update checked status'
+            })
+
+    except Exception as e:
+        try:
+            print(f"[DEBUG] Error updating checked status: {e}")
+        except UnicodeEncodeError:
+            print(f"[DEBUG] Error updating checked status: [Unicode encoding error]")
+        try:
+            error_msg = str(e)
+        except UnicodeEncodeError:
+            error_msg = "Unicode encoding error in exception message"
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        })
+
+if __name__ == "__main__":
     # Create necessary directories
     os.makedirs('templates', exist_ok=True)
     os.makedirs('static/css', exist_ok=True)

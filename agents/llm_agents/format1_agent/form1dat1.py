@@ -469,3 +469,200 @@ class Form1Dat1Agent:
         except Exception as e:
             print(f"[ERROR] Error retrieving section data: {str(e)}")
             return None
+
+    def integrate_table_ocr_files(self, order_number: str) -> bool:
+        """
+        Integrate all table_ocr files for an order into Section 3 of the database
+        This should be called after form1ocr1 creates all the OCR files
+
+        Args:
+            order_number: The order number identifier
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            print(f"[INFO] Starting table OCR integration for order {order_number}")
+
+            # Initialize order if it doesn't exist
+            self.initialize_order(order_number)
+
+            # Path to table_ocr files
+            table_ocr_path = self.base_output_path / "table_detection" / "Table_ocr"
+
+            # Find all table_ocr files for this order
+            import glob
+            pattern = str(table_ocr_path / f"{order_number}_table_ocr_page*.json")
+            ocr_files = glob.glob(pattern)
+
+            if not ocr_files:
+                print(f"[WARNING] No table OCR files found for order {order_number}")
+                return False
+
+            print(f"[INFO] Found {len(ocr_files)} table OCR files")
+
+            # Initialize Section 3 structure
+            section3_data = {}
+
+            # Process each OCR file
+            for ocr_file in sorted(ocr_files):
+                try:
+                    # Extract page number from filename
+                    filename = os.path.basename(ocr_file)
+                    page_num = filename.split('_page')[1].split('.json')[0]
+
+                    print(f"[INFO] Processing page {page_num}")
+
+                    # Load OCR data
+                    with open(ocr_file, 'r', encoding='utf-8') as f:
+                        ocr_data = json.load(f)
+
+                    # Check if this file has table data
+                    if 'table_data' not in ocr_data or 'rows' not in ocr_data['table_data']:
+                        print(f"[WARNING] No table data found in {filename}")
+                        continue
+
+                    rows = ocr_data['table_data']['rows']
+                    if not rows:
+                        print(f"[WARNING] No rows found in {filename}")
+                        continue
+
+                    # Create page structure
+                    page_key = f"page_{page_num}"
+                    section3_data[page_key] = {
+                        "page_number": int(page_num),
+                        "number_of_order_lines": len(rows),
+                        "order_lines": {}
+                    }
+
+                    # Process each row
+                    for row_index, row_data in enumerate(rows):
+                        line_number = row_index + 1
+                        line_key = f"line_{line_number}"
+
+                        # Extract data according to database structure
+                        section3_data[page_key]["order_lines"][line_key] = {
+                            "line_number": line_number,
+                            "order_line_no": row_data.get('מס', ''),
+                            "shape_number": row_data.get('shape', ''),
+                            "number_of_ribs": 0,  # Default, will be updated when shape analysis is available
+                            "diameter": row_data.get('קוטר', ''),
+                            "number_of_units": self._safe_int_convert(row_data.get('סהכ יחידות', '')),
+                            "length": row_data.get('אורך', ''),  # Length field from table_ocr
+                            "weight": row_data.get('משקל', ''),  # Weight field from table_ocr
+                            "notes": row_data.get('הערות', ''),  # Notes field from table_ocr
+                            "checked": False,  # User verification status - default false
+                            "ribs": {}  # Will be populated when shape analysis is available
+                        }
+
+                        try:
+                            # Use safe printing to avoid encoding issues
+                            order_no = row_data.get('מס', '')
+                            shape = row_data.get('shape', '')
+                            print(f"[INFO] Integrated line {line_number}: Order {order_no}")
+                        except UnicodeEncodeError:
+                            print(f"[INFO] Integrated line {line_number}")
+
+                except Exception as e:
+                    print(f"[ERROR] Error processing {ocr_file}: {str(e)}")
+                    continue
+
+            # Save the integrated data to Section 3
+            if section3_data:
+                success = self.update_section(order_number, "section_3_shape_analysis", section3_data, merge=False)
+
+                if success:
+                    print(f"[OK] Successfully integrated {len(section3_data)} pages into database")
+                    print(f"[OK] Total order lines integrated: {sum(page['number_of_order_lines'] for page in section3_data.values())}")
+                    return True
+                else:
+                    print(f"[ERROR] Failed to save integrated data to database")
+                    return False
+            else:
+                print(f"[WARNING] No data to integrate")
+                return False
+
+        except Exception as e:
+            print(f"[ERROR] Error in table OCR integration: {str(e)}")
+            return False
+
+    def _safe_int_convert(self, value: str) -> int:
+        """
+        Safely convert string to integer
+
+        Args:
+            value: String value to convert
+
+        Returns:
+            int: Converted value or 0 if conversion fails
+        """
+        try:
+            if isinstance(value, str) and value.isdigit():
+                return int(value)
+            elif isinstance(value, int):
+                return value
+            else:
+                return 0
+        except:
+            return 0
+
+    def update_line_checked_status(self, order_number: str, page_number: int, line_number: int, checked: bool) -> bool:
+        """
+        Update the checked status for a specific line
+
+        Args:
+            order_number: The order number identifier
+            page_number: Page number (1-based)
+            line_number: Line number within the page (1-based)
+            checked: True if checked, False if unchecked
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            file_path = self.json_output_path / f"{order_number}_out.json"
+
+            if not file_path.exists():
+                print(f"[ERROR] Order {order_number} not found")
+                return False
+
+            # Load current data
+            with open(file_path, 'r', encoding='utf-8') as f:
+                order_data = json.load(f)
+
+            # Navigate to the specific line
+            page_key = f"page_{page_number}"
+            line_key = f"line_{line_number}"
+
+            if "section_3_shape_analysis" not in order_data:
+                print(f"[ERROR] Section 3 not found in order {order_number}")
+                return False
+
+            if page_key not in order_data["section_3_shape_analysis"]:
+                print(f"[ERROR] Page {page_number} not found in order {order_number}")
+                return False
+
+            if line_key not in order_data["section_3_shape_analysis"][page_key]["order_lines"]:
+                print(f"[ERROR] Line {line_number} not found in page {page_number} of order {order_number}")
+                return False
+
+            # Update the checked status
+            order_data["section_3_shape_analysis"][page_key]["order_lines"][line_key]["checked"] = checked
+
+            # Update metadata
+            order_data["section_1_general"]["date_modified"] = datetime.now().isoformat()
+
+            # Save updated data
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(order_data, f, indent=2, ensure_ascii=False)
+
+            # Update cache
+            self.data_cache[f"{order_number}_main"] = order_data
+
+            status_text = "checked" if checked else "unchecked"
+            print(f"[OK] Line {line_number} on page {page_number} marked as {status_text}")
+            return True
+
+        except Exception as e:
+            print(f"[ERROR] Error updating checked status: {str(e)}")
+            return False

@@ -1,4 +1,4 @@
-// Global variables - CACHE BUST: 2025-09-21-22:03 - REMOVED YELLOW BACKGROUND
+// Global variables - CACHE BUST: 2025-09-21-23:20 - MANUAL TEST ADDED
 let pdfDoc = null;
 let pageNum = 1;
 let pageRendering = false;
@@ -38,7 +38,7 @@ const sectionColors = {
 document.addEventListener('DOMContentLoaded', function() {
     // Setup event listeners
     setupEventListeners();
-    
+
     // Load initial data if available
     loadLatestAnalysis();
 
@@ -48,11 +48,14 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize button visibility
     updateClearButtonVisibility();
 
-    // FORCE SHOW ORDER HEADER SECTION FOR TESTING
+    // Removed: Order header section display - not needed anymore
+
+    // Initialize page displays
     setTimeout(() => {
-        console.log('🚀 FORCING ORDER HEADER SECTION TO SHOW...');
-        showOrderHeaderSection('/order_header_image/CO25S006375_order_title_page1_order_header.png');
-    }, 1000);
+        updatePageDisplays(1);
+    }, 500);
+
+
 });
 
 // Setup all event listeners
@@ -87,14 +90,11 @@ function setupEventListeners() {
     // Setup inline editing for header fields
     setupInlineEditing();
     
-    // Header action buttons
-    document.getElementById('clear-header-btn').addEventListener('click', clearHeaderData);
-    document.getElementById('redetect-header-btn').addEventListener('click', redetectHeader);
+    // Header action buttons (removed)
 
-    const ocrBtn = document.getElementById('run-ocr-btn');
-    if (ocrBtn) {
-        ocrBtn.addEventListener('click', runOCRAnalysis);
-    }
+    // Table save button removed
+
+    // OCR button removed
 
     // Shapes re-detect button
     document.getElementById('redetect-shapes-btn').addEventListener('click', redetectShapes);
@@ -300,80 +300,69 @@ function displayAnalysisData(data) {
             console.log('Processing OCR data:', data.ocr_data);
             const ocrData = data.ocr_data;
 
-            // Map OCR fields to form fields
+            // Map OCR fields to form fields with null checks
             if (ocrData['לקוח/פרויקט'] && ocrData['לקוח/פרויקט'] !== 'empty') {
-                document.getElementById('detail-customer').value = ocrData['לקוח/פרויקט'];
-                document.getElementById('customer-name').textContent = ocrData['לקוח/פרויקט'];
+                const customerEl = document.getElementById('detail-customer');
+                const customerNameEl = document.getElementById('customer-name');
+                if (customerEl) customerEl.value = ocrData['לקוח/פרויקט'];
+                if (customerNameEl) customerNameEl.textContent = ocrData['לקוח/פרויקט'];
             }
             if (ocrData['איש קשר באתר'] && ocrData['איש קשר באתר'] !== 'empty') {
-                document.getElementById('detail-contact').value = ocrData['איש קשר באתר'];
+                const contactEl = document.getElementById('detail-contact');
+                if (contactEl) contactEl.value = ocrData['איש קשר באתר'];
             }
             if (ocrData['טלפון'] && ocrData['טלפון'] !== 'empty') {
-                document.getElementById('detail-phone').value = ocrData['טלפון'];
+                const phoneEl = document.getElementById('detail-phone');
+                if (phoneEl) phoneEl.value = ocrData['טלפון'];
             }
             if (ocrData['כתובת האתר'] && ocrData['כתובת האתר'] !== 'empty') {
-                document.getElementById('detail-address').value = ocrData['כתובת האתר'];
+                const addressEl = document.getElementById('detail-address');
+                if (addressEl) addressEl.value = ocrData['כתובת האתר'];
             }
             if (ocrData['מס הזמנה'] && ocrData['מס הזמנה'] !== 'empty') {
-                document.getElementById('detail-order-number').value = ocrData['מס הזמנה'];
-                document.getElementById('order-number').textContent = ocrData['מס הזמנה'];
+                const orderNumEl = document.getElementById('detail-order-number');
+                const orderDisplayEl = document.getElementById('order-number');
+                if (orderNumEl) orderNumEl.value = ocrData['מס הזמנה'];
+                if (orderDisplayEl) orderDisplayEl.textContent = ocrData['מס הזמנה'];
             }
             if (ocrData['שם התוכנית'] && ocrData['שם התוכנית'] !== 'empty') {
-                document.getElementById('detail-program-name').value = ocrData['שם התוכנית'];
+                const programEl = document.getElementById('detail-program-name');
+                if (programEl) programEl.value = ocrData['שם התוכנית'];
             }
             if (ocrData['סה"כ משקל'] && ocrData['סה"כ משקל'] !== 'empty') {
-                document.getElementById('detail-weight').value = ocrData['סה"כ משקל'];
+                const weightEl = document.getElementById('detail-weight');
+                if (weightEl) weightEl.value = ocrData['סה"כ משקל'];
             }
             if (ocrData['תאריך הזמנה'] && ocrData['תאריך הזמנה'] !== 'empty') {
-                document.getElementById('detail-order-date').value = ocrData['תאריך הזמנה'];
+                const orderDateEl = document.getElementById('detail-order-date');
+                if (orderDateEl) orderDateEl.value = ocrData['תאריך הזמנה'];
             }
             if (ocrData['תאריך אספקה'] && ocrData['תאריך אספקה'] !== 'empty') {
-                document.getElementById('detail-delivery-date').value = ocrData['תאריך אספקה'];
+                const deliveryDateEl = document.getElementById('detail-delivery-date');
+                if (deliveryDateEl) deliveryDateEl.value = ocrData['תאריך אספקה'];
             }
 
             console.log('OCR data has been populated to form fields');
 
-            // Show the order header image section when OCR data is loaded
-            showOrderHeaderSection();
+            // Removed: showOrderHeaderSection() call
         }
             
-            // Display order header image if available
+            // Display order header image for page 1
             const headerImage = document.getElementById('order-header-image');
-            const noHeaderImage = document.getElementById('no-header-image');
-
-            if (data.order_header_image_path) {
-                // Extract filename from full path
-                const filename = data.order_header_image_path.split(/[\\\/]/).pop();
-                const imageUrl = `/order_header_image/${filename}`;
-
-                console.log('🔍 DEBUG: Found order_header_image_path:', data.order_header_image_path);
-                console.log('🔍 DEBUG: Extracted filename:', filename);
-                console.log('🔍 DEBUG: Image URL:', imageUrl);
-
-                // Show the order header section when image path is available
-                showOrderHeaderSection(imageUrl);
+            if (headerImage && data.file) {
+                // Extract the order number from the filename
+                const orderNumber = data.file.replace('.pdf', '');
+                // Always use page 1 header image
+                const headerImageUrl = `/order_header_image/${orderNumber}_order_title_page1_order_header.png`;
 
                 headerImage.onerror = function() {
-                    console.error('❌ Failed to load header image:', imageUrl);
-                    // Show placeholder if image fails to load
-                    headerImage.style.display = 'none';
-                    noHeaderImage.style.display = 'block';
+                    console.log('Header image not found, trying alternative path...');
+                    // Fallback to the default image if specific one not found
+                    this.src = '/order_header_image/CO25S006375_order_title_page1_order_header.png';
                 };
 
-                headerImage.onload = function() {
-                    console.log('✅ Successfully loaded header image:', filename);
-                    // Show image and hide placeholder
-                    headerImage.style.display = 'block';
-                    noHeaderImage.style.display = 'none';
-                };
-
-                headerImage.src = imageUrl;
-                console.log('🔍 DEBUG: Setting header image src:', imageUrl);
-            } else {
-                // No image available - show placeholder
-                headerImage.style.display = 'none';
-                noHeaderImage.style.display = 'block';
-                console.log('No header image path found in data');
+                headerImage.src = headerImageUrl;
+                console.log('🖼️ Loading header image:', headerImageUrl);
             }
 
         // Table section
@@ -408,11 +397,11 @@ function displayAnalysisData(data) {
                         row.insertCell(3).textContent = item[4] || '-';  // קוטר [mm]
                         row.insertCell(4).textContent = item[3] || '1';  // סה"כ יח'
                         row.insertCell(5).textContent = item[2] || '-';  // אורך [m]
-                        
+
                         const weight = parseFloat(item[1] || '0');
                         row.insertCell(6).textContent = weight || '-';  // סה"כ משקל [kg]
                         totalWeight += weight;
-                        
+
                         row.insertCell(7).textContent = item[5] || '-';  // הערות
                     } else {
                         // Object format (fallback)
@@ -421,11 +410,11 @@ function displayAnalysisData(data) {
                         row.insertCell(3).textContent = item['קוטר'] || item['קוטר [mm]'] || '-';
                         row.insertCell(4).textContent = item['יחידות'] || item['units'] || item['כמות'] || item['סה"כ יח\''] || '1';
                         row.insertCell(5).textContent = item['אורך'] || item['אורך [m]'] || '-';
-                        
+
                         const weight = parseFloat(item['סה"כ משקל'] || item['סה"כ משקל [kg]'] || '0');
                         row.insertCell(6).textContent = weight || '-';
                         totalWeight += weight;
-                        
+
                         row.insertCell(7).textContent = item['הערות'] || '-';
                     }
                 });
@@ -457,7 +446,10 @@ async function loadPDF(pdfPath) {
         pdfDoc = await loadingTask.promise;
         
         // Update page count
-        document.getElementById('page-count').textContent = pdfDoc.numPages;
+        const pageCountElement = document.getElementById('page-count');
+        if (pageCountElement) {
+            pageCountElement.textContent = pdfDoc.numPages;
+        }
         
         // Initial page rendering
         renderPage(pageNum);
@@ -510,7 +502,13 @@ function renderPage(num) {
     });
     
     // Update page info
-    document.getElementById('page-num').textContent = num;
+    const pageNumElement = document.getElementById('page-num');
+    if (pageNumElement) {
+        pageNumElement.textContent = num;
+    }
+
+    // Update current page display in table section and title
+    updatePageDisplays(num);
 }
 
 // Queue page rendering
@@ -559,6 +557,356 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.toggle('active', content.id === `${tabName}-tab`);
     });
+}
+
+// Update page displays
+function updatePageDisplays(pageNumber) {
+    // Update the title page display
+    const titlePageDisplay = document.getElementById('title-page-display');
+    if (titlePageDisplay) {
+        titlePageDisplay.textContent = `עמוד ${pageNumber}`;
+    }
+
+    // Update table data for current page
+    updateTableForCurrentPage(pageNumber);
+}
+
+// Filter and display table OCR data for specific page
+function updateTableForCurrentPage(pageNumber) {
+    // Fetch table OCR data from the new API endpoint
+    fetch(`/api/table-ocr/${pageNumber}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Transform the OCR data format to match our table structure
+                const transformedItems = data.rows.map(row => ({
+                    'מס': row['מס'] || row['row_number'] || '',
+                    'shape': row['shape'] || '-', // Shape information for צורה column
+                    'קוטר': row['קוטר'] || '-',
+                    'סהכ יחידות': row['סהכ יחידות'] || '-',
+                    'אורך': row['אורך'] || '-',
+                    'משקל': row['משקל'] || '-',
+                    'הערות': row['הערות'] || '-',
+                    'checked': false  // Default to unchecked initially
+                }));
+
+                displayTableItems(transformedItems, pageNumber);
+            } else {
+
+                // Fallback to existing data structure for backward compatibility
+                if (currentData && currentData.table) {
+                    const table = currentData.table;
+                    let pageItems = [];
+
+                    // Check if we have page-specific data structure
+                    if (table.pages && table.pages[pageNumber]) {
+                        pageItems = table.pages[pageNumber].items || [];
+                    } else if (table.all_items && Array.isArray(table.all_items)) {
+                        pageItems = table.all_items.filter(item => {
+                            if (item.page === pageNumber) return true;
+                            if (Array.isArray(item) && item.length > 6 && item[6] === pageNumber) return true;
+                            return false;
+                        });
+
+                        if (pageItems.length === 0 && pageNumber === 1) {
+                            pageItems = table.all_items;
+                        }
+                    } else if (pageNumber === 1) {
+                        pageItems = table.sample_items || [];
+                    }
+
+                    displayTableItems(pageItems, pageNumber);
+                } else {
+                    // No data available
+                    displayTableItems([], pageNumber);
+                }
+            }
+        })
+        .catch(error => {
+            console.error(`❌ Error fetching table OCR data for page ${pageNumber}:`, error);
+            // Fallback to empty data
+            displayTableItems([], pageNumber);
+        });
+}
+
+// Display table items in the UI
+function displayTableItems(items, pageNumber) {
+    const tbody = document.getElementById('items-tbody');
+    if (!tbody) {
+        console.log('❌ Table body not found');
+        return;
+    }
+
+    tbody.innerHTML = '';
+
+    if (items.length > 0) {
+        let totalWeight = 0;
+        console.log(`📊 Displaying ${items.length} items for page ${pageNumber}`);
+
+        items.forEach((item, index) => {
+            const row = tbody.insertRow();
+            row.setAttribute('data-row-id', index);
+            row.setAttribute('data-page', pageNumber);
+
+            // Expand button
+            const expandCell = row.insertCell(0);
+            expandCell.innerHTML = '<button class="expand-btn" onclick="toggleRow(' + index + ')">+</button>';
+
+            // Create editable cells
+            function createEditableCell(value, fieldName) {
+                const cell = row.insertCell();
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = value || '-';
+                input.className = 'table-editable';
+                input.style.cssText = 'width: 100%; border: none; background: transparent; padding: 2px 4px; font-size: 13px;';
+                input.setAttribute('data-field', fieldName);
+                input.setAttribute('data-row-id', index);
+                input.setAttribute('data-original-value', value || '-');
+
+                // Add event listeners for editing
+                input.addEventListener('focus', function() {
+                    this.style.background = '#f0f8ff';
+                    this.select();
+                });
+
+                input.addEventListener('blur', function() {
+                    this.style.background = 'transparent';
+                    if (this.value !== this.getAttribute('data-original-value')) {
+                        saveTableCell(pageNumber, index, fieldName, this.value);
+                        this.setAttribute('data-original-value', this.value);
+                    }
+                });
+
+                input.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        this.blur();
+                    }
+                });
+
+                cell.appendChild(input);
+                return cell;
+            }
+
+            // Handle both array format and object format
+            if (Array.isArray(item)) {
+                // Array format: [מס', סה"כ משקל, אורך, סה"כ יח', קוטר, הערות]
+                createEditableCell(item[0] || (index + 1), 'מס');
+                createEditableCell('-', 'shape');  // צורה - not available in array format
+                createEditableCell(item[4] || '-', 'קוטר');
+                createEditableCell(item[3] || '1', 'סהכ יחידות');
+                createEditableCell(item[2] || '-', 'אורך');
+
+                const weight = parseFloat(item[1] || '0');
+                createEditableCell(weight || '-', 'משקל');
+                totalWeight += weight;
+
+                createEditableCell(item[5] || '-', 'הערות');
+            } else {
+                // Object format - now handles OCR data structure properly
+                createEditableCell(item['מס'] || item['מס\''] || (index + 1), 'מס');
+                createEditableCell(item['shape'] || item['צורה'] || '-', 'shape');
+                createEditableCell(item['קוטר'] || '-', 'קוטר');
+                createEditableCell(item['סהכ יחידות'] || item['יחידות'] || item['units'] || item['כמות'] || '1', 'סהכ יחידות');
+                createEditableCell(item['אורך'] || '-', 'אורך');
+
+                const weight = parseFloat(item['משקל'] || item['סה"כ משקל'] || '0');
+                createEditableCell(weight || '-', 'משקל');
+                totalWeight += weight;
+
+                createEditableCell(item['הערות'] || '-', 'הערות');
+            }
+
+            // Add check button cell
+            const checkCell = row.insertCell();
+            let checked = item['checked'] || false;
+
+            const checkButton = document.createElement('button');
+            checkButton.className = 'check-btn';
+            checkButton.style.cssText = `
+                width: 30px;
+                height: 30px;
+                border: 2px solid ${checked ? '#28a745' : '#ccc'};
+                background: ${checked ? '#28a745' : 'transparent'};
+                color: ${checked ? 'white' : '#666'};
+                border-radius: 4px;
+                cursor: pointer;
+                font-weight: bold;
+                font-size: 16px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            `;
+            checkButton.textContent = checked ? '✓' : '';
+            checkButton.title = checked ? 'הסר סימון' : 'סמן כבדוק';
+            checkButton.setAttribute('data-checked', checked);
+
+            checkButton.addEventListener('click', function() {
+                const currentChecked = this.getAttribute('data-checked') === 'true';
+                const newChecked = !currentChecked;
+                toggleCheckStatus(pageNumber, index + 1, newChecked, this);
+                this.setAttribute('data-checked', newChecked);
+            });
+
+            checkCell.appendChild(checkButton);
+            checkCell.style.textAlign = 'center';
+        });
+
+        // Update total weight and row count
+        document.getElementById('total-weight').textContent = totalWeight.toFixed(1) + ' kg';
+        document.getElementById('total-rows').textContent = items.length;
+
+        console.log(`✅ Table updated: ${items.length} items, total weight: ${totalWeight.toFixed(1)} kg`);
+
+        // Initialize row lock states after table is rendered
+        setTimeout(() => {
+            initializeRowLockStates();
+        }, 100);
+    } else {
+        tbody.innerHTML = '<tr><td colspan="9" class="no-data">אין נתונים להצגה עבור עמוד ' + pageNumber + '</td></tr>';
+        document.getElementById('total-weight').textContent = '0 kg';
+        document.getElementById('total-rows').textContent = '0';
+        console.log(`📄 No data to display for page ${pageNumber}`);
+    }
+}
+
+// Toggle check status for a line
+async function toggleCheckStatus(pageNumber, lineNumber, checked, buttonElement) {
+    try {
+        // Get the current order number
+        const orderNumber = getCurrentOrderNumber();
+        if (!orderNumber) {
+            alert('לא נמצא מספר הזמנה');
+            return;
+        }
+
+        // Get the current row data from screen
+        const row = buttonElement.closest('tr');
+        const rowData = {};
+
+        // Extract data from all input fields in this row
+        const inputs = row.querySelectorAll('input[data-field]');
+        inputs.forEach(input => {
+            const fieldName = input.getAttribute('data-field');
+            let value = input.value;
+
+            // Convert numeric fields to proper types
+            if (fieldName === 'משקל' || fieldName === 'קוטר' || fieldName === 'סהכ יחידות') {
+                const numValue = parseFloat(value);
+                value = !isNaN(numValue) ? numValue : value;
+            }
+
+            rowData[fieldName] = value;
+        });
+
+        // Update button appearance immediately for better UX
+        buttonElement.style.border = `2px solid ${checked ? '#28a745' : '#ccc'}`;
+        buttonElement.style.background = checked ? '#28a745' : 'transparent';
+        buttonElement.style.color = checked ? 'white' : '#666';
+        buttonElement.textContent = checked ? '✓' : '';
+        buttonElement.title = checked ? 'הסר סימון' : 'סמן כבדוק';
+
+        // Send update to server with current screen data
+        const response = await fetch('/api/update-checked-status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                orderNumber: orderNumber,
+                pageNumber: pageNumber,
+                lineNumber: lineNumber,
+                checked: checked,
+                rowData: rowData  // Add the current screen data
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
+
+        if (!result.success) {
+            // Revert button appearance if update failed
+            buttonElement.style.border = `2px solid ${!checked ? '#28a745' : '#ccc'}`;
+            buttonElement.style.background = !checked ? '#28a745' : 'transparent';
+            buttonElement.style.color = !checked ? 'white' : '#666';
+            buttonElement.textContent = !checked ? '✓' : '';
+            buttonElement.title = !checked ? 'הסר סימון' : 'סמן כבדוק';
+
+            alert('שגיאה בעדכון סטטוס הבדיקה: ' + result.error);
+        } else {
+            // Success: Lock/unlock the row inputs based on checked status
+            toggleRowLock(row, checked);
+        }
+
+    } catch (error) {
+        console.error('Error updating check status:', error);
+
+        // Revert button appearance if update failed
+        buttonElement.style.border = `2px solid ${!checked ? '#28a745' : '#ccc'}`;
+        buttonElement.style.background = !checked ? '#28a745' : 'transparent';
+        buttonElement.style.color = !checked ? 'white' : '#666';
+        buttonElement.textContent = !checked ? '✓' : '';
+        buttonElement.title = !checked ? 'הסר סימון' : 'סמן כבדוק';
+
+        alert('שגיאה בעדכון סטטוס הבדיקה');
+    }
+}
+
+// Toggle row input fields lock/unlock based on checkbox status
+function toggleRowLock(row, isLocked) {
+    // Find all input fields in this row
+    const inputs = row.querySelectorAll('input[data-field]');
+
+    inputs.forEach(input => {
+        if (isLocked) {
+            // Lock the row: disable inputs and add visual styling
+            input.disabled = true;
+            input.style.backgroundColor = '#f8f9fa';
+            input.style.borderColor = '#e9ecef';
+            input.style.color = '#6c757d';
+            input.style.cursor = 'not-allowed';
+        } else {
+            // Unlock the row: enable inputs and restore normal styling
+            input.disabled = false;
+            input.style.backgroundColor = '';
+            input.style.borderColor = '';
+            input.style.color = '';
+            input.style.cursor = '';
+        }
+    });
+
+    // Add/remove locked class to the entire row for additional styling
+    if (isLocked) {
+        row.classList.add('row-locked');
+    } else {
+        row.classList.remove('row-locked');
+    }
+}
+
+// Get current order number from analysis file
+function getCurrentOrderNumber() {
+    // Get the current order number from current analysis file
+    if (currentData?.file) {
+        return currentData.file.replace('.pdf', '');
+    }
+
+    // Try to get from header display as fallback
+    const orderElement = document.getElementById('order-number');
+    if (orderElement && orderElement.textContent !== '-') {
+        return orderElement.textContent;
+    }
+
+    // Try to get from detail input as fallback
+    const orderDetailElement = document.getElementById('detail-order-number');
+    if (orderDetailElement && orderDetailElement.value !== '-' && orderDetailElement.value !== '') {
+        return orderDetailElement.value;
+    }
+
+    // Final fallback
+    return 'CO25S006375';
 }
 
 // Update last update time
@@ -852,19 +1200,7 @@ async function redetectHeader() {
                 document.getElementById('processing-status').textContent = 'ניתוח הכותרת הושלם, אך לא נמצאו שדות חדשים';
             }
             
-            // Also reload the header image if available
-            if (currentData && currentData.user_sections && currentData.user_sections.order_header) {
-                const headerSection = currentData.user_sections.order_header;
-                const headerImageSection = document.getElementById('header-image-section');
-                const headerImage = document.getElementById('order-header-image');
-                
-                if (headerSection.filename) {
-                    const timestamp = headerSection.selection ? headerSection.selection.timestamp : Date.now();
-                    const imageUrl = `/order_header_image/${headerSection.filename}?t=${timestamp}`;
-                    headerImage.src = imageUrl;
-                    headerImageSection.style.display = 'block';
-                }
-            }
+            // Removed: Header image reload logic - not needed anymore
             
         } else {
             throw new Error(result.error || 'ניתוח הכותרת נכשל');
@@ -2008,71 +2344,176 @@ function updateSelectionCanvasSize() {
     }
 }
 
-// Function to dynamically show the order header section
-function showOrderHeaderSection(imageUrl = null) {
-    console.log('🖼️ Showing order header section...', imageUrl ? `with image: ${imageUrl}` : '');
+// Removed: showOrderHeaderSection and createOrderHeaderSection functions - not needed anymore
 
-    // Try to find the order header section by different possible IDs/classes
-    let headerSection = document.getElementById('header-image-section');
+// Save table cell data
+async function saveTableCell(pageNumber, rowIndex, fieldName, newValue) {
+    try {
+        // Get the current order number
+        const orderNumber = currentData?.file?.replace('.pdf', '') || 'CO25S006375';
 
-    if (headerSection) {
-        // Force show the section
-        headerSection.style.display = 'block';
-        headerSection.style.visibility = 'visible';
-        headerSection.style.padding = '20px';
-        headerSection.style.margin = '20px 0';
-
-        console.log('✅ Order header section is now visible!');
-
-        // Update the section title
-        const sectionTitle = headerSection.querySelector('h4');
-        if (sectionTitle) {
-            sectionTitle.textContent = 'תמונת כותרת הזמנה מעמוד 1';
+        // Show saving indicator
+        const statusEl = document.getElementById('processing-status');
+        if (statusEl) {
+            statusEl.textContent = 'שומר...';
+            statusEl.style.color = '#ffa500';
         }
 
-        // Update image if URL provided
-        if (imageUrl) {
-            const headerImage = headerSection.querySelector('#order-header-image');
-            if (headerImage) {
-                headerImage.src = imageUrl;
-                headerImage.style.display = 'block';
-                console.log('✅ Image source updated to:', imageUrl);
+        const response = await fetch('/api/update-table-cell', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                orderNumber: orderNumber,
+                pageNumber: pageNumber,
+                rowIndex: rowIndex,
+                fieldName: fieldName,
+                value: newValue
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Show success message briefly
+            if (statusEl) {
+                statusEl.textContent = 'נשמר ✓';
+                statusEl.style.color = '#10b981';
+                setTimeout(() => {
+                    statusEl.textContent = '';
+                }, 2000);
+            }
+
+            // Update total weight if weight field was changed
+            if (fieldName === 'משקל') {
+                updateTotalWeight();
+            }
+
+            console.log('✅ Table cell saved successfully');
+        } else {
+            throw new Error(result.error || 'Failed to save');
+        }
+    } catch (error) {
+        console.error('Error saving table cell:', error);
+        const statusEl = document.getElementById('processing-status');
+        if (statusEl) {
+            statusEl.textContent = 'שגיאה בשמירה ✗';
+            statusEl.style.color = '#ef4444';
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 3000);
+        }
+    }
+}
+
+// Update total weight calculation
+function updateTotalWeight() {
+    let totalWeight = 0;
+    const weightInputs = document.querySelectorAll('.table-editable[data-field="משקל"]');
+    weightInputs.forEach(input => {
+        const weight = parseFloat(input.value) || 0;
+        totalWeight += weight;
+    });
+    document.getElementById('total-weight').textContent = totalWeight.toFixed(1) + ' kg';
+}
+
+// Save all table data
+async function saveAllTableData() {
+    const statusEl = document.getElementById('processing-status');
+    const saveBtn = document.getElementById('save-all-table');
+
+    try {
+        // Disable button during save
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<span class="btn-icon">⏳</span> שומר...';
+        }
+
+        // Show saving status
+        if (statusEl) {
+            statusEl.textContent = 'שומר את כל הנתונים...';
+            statusEl.style.color = '#ffa500';
+        }
+
+        // Get all editable cells
+        const editableCells = document.querySelectorAll('.table-editable');
+        let saveCount = 0;
+        let errorCount = 0;
+
+        // Get current page number from the first row
+        const firstRow = document.querySelector('tr[data-page]');
+        const pageNumber = firstRow ? firstRow.getAttribute('data-page') : 1;
+
+        // Save each cell that has been modified
+        for (const cell of editableCells) {
+            const currentValue = cell.value;
+            const originalValue = cell.getAttribute('data-original-value');
+
+            if (currentValue !== originalValue) {
+                const rowId = cell.getAttribute('data-row-id');
+                const fieldName = cell.getAttribute('data-field');
+
+                try {
+                    await saveTableCell(pageNumber, parseInt(rowId), fieldName, currentValue);
+                    cell.setAttribute('data-original-value', currentValue);
+                    saveCount++;
+                } catch (error) {
+                    errorCount++;
+                    console.error('Failed to save cell:', error);
+                }
             }
         }
-    } else {
-        console.log('❌ Order header section not found in DOM');
 
-        // If section doesn't exist, create it dynamically
-        createOrderHeaderSection(imageUrl);
+        // Show result
+        if (statusEl) {
+            if (errorCount === 0) {
+                statusEl.textContent = `✅ נשמרו ${saveCount} שינויים בהצלחה`;
+                statusEl.style.color = '#10b981';
+            } else {
+                statusEl.textContent = `⚠️ נשמרו ${saveCount} שינויים, ${errorCount} שגיאות`;
+                statusEl.style.color = '#ffa500';
+            }
+
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 3000);
+        }
+
+    } catch (error) {
+        console.error('Error saving all table data:', error);
+        if (statusEl) {
+            statusEl.textContent = 'שגיאה בשמירת הנתונים';
+            statusEl.style.color = '#ef4444';
+            setTimeout(() => {
+                statusEl.textContent = '';
+            }, 3000);
+        }
+    } finally {
+        // Re-enable button
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<span class="btn-icon">💾</span> שמור הכל';
+        }
     }
 }
 
-// Function to create the order header section if it doesn't exist
-function createOrderHeaderSection(imageUrl = null) {
-    console.log('🔨 Creating order header section dynamically...', imageUrl ? `with image: ${imageUrl}` : '');
+// Initialize row lock states based on button checked attributes
+function initializeRowLockStates() {
+    // Find all check buttons that have data-checked="true"
+    const checkButtons = document.querySelectorAll('.check-btn[data-checked="true"]');
 
-    const headerTab = document.getElementById('header-tab');
-    if (headerTab) {
-        const defaultImageSrc = imageUrl || '/order_header_image/CO25S006375_order_title_page1_order_header.png';
-        const headerHTML = `
-            <div class="header-image-section" id="header-image-section" style="display: block; visibility: visible; padding: 20px; margin: 20px 0;">
-                <div class="section-header">
-                    <h4>תמונת כותרת הזמנה מעמוד 1</h4>
-                </div>
-                <div class="header-image-container">
-                    <img id="order-header-image" src="${defaultImageSrc}" alt="תמונת כותרת הזמנה" class="header-image" style="display: block;" />
-                    <div id="no-header-image" class="placeholder" style="display: none;">
-                        <p>📋 אין תמונת כותרת זמינה</p>
-                        <p>הרץ ניתוח כדי לזהות כותרת מהמסמך</p>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Insert at the beginning of the header tab
-        headerTab.insertAdjacentHTML('afterbegin', headerHTML);
-        console.log('✅ Order header section created successfully with image:', defaultImageSrc);
-    } else {
-        console.log('❌ Header tab not found, cannot create section');
-    }
+    checkButtons.forEach(button => {
+        const row = button.closest('tr');
+        if (row) {
+            // Lock the row if the button is marked as checked
+            toggleRowLock(row, true);
+        }
+    });
 }
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Small delay to ensure all content is loaded
+    setTimeout(initializeRowLockStates, 100);
+});
