@@ -2,7 +2,7 @@
 Flask Web Application for IRONMAN Order Analysis System
 """
 
-from flask import Flask, render_template, jsonify, send_file, request
+from flask import Flask, render_template, jsonify, send_file, request, abort
 from flask_cors import CORS
 import os
 import json
@@ -12,6 +12,7 @@ from datetime import datetime
 import glob
 import io
 import sys
+import fnmatch
 
 # Import the OrderHeader agent
 from agents.llm_agents.orderheader_agent import OrderHeaderAgent
@@ -244,6 +245,22 @@ def serve_order_header_image(filename):
             return send_file(image_path, mimetype='image/png')
         else:
             return jsonify({'error': 'Order header image not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/catalog_image/<catalog_number>')
+def serve_catalog_image(catalog_number):
+    """Serve catalog images from the io/catalog folder"""
+    try:
+        catalog_dir = os.path.join('io', 'catalog')
+        # Format: shape XXX.png where XXX is the catalog number
+        filename = f"shape {catalog_number}.png"
+        image_path = os.path.join(catalog_dir, filename)
+
+        if os.path.exists(image_path):
+            return send_file(image_path, mimetype='image/png')
+        else:
+            return jsonify({'error': f'Catalog image not found for {catalog_number}'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -1189,6 +1206,85 @@ def update_checked_status():
             'success': False,
             'error': error_msg
         })
+
+@app.route('/api/shape-images/<string:order_number>/<int:page_number>')
+def get_shape_images(order_number, page_number):
+    """Get list of shape images for a specific order and page"""
+    try:
+        # Path to the shapes folder
+        shapes_folder = os.path.join('io', 'fullorder_output', 'table_detection', 'shapes')
+
+        if not os.path.exists(shapes_folder):
+            return jsonify({
+                'success': False,
+                'error': 'Shapes folder not found',
+                'images': []
+            })
+
+        # Find all shape images for this order and page
+        pattern = f"{order_number}_drawing_row_*_page{page_number}.png"
+        image_files = []
+
+        for filename in os.listdir(shapes_folder):
+            if fnmatch.fnmatch(filename, pattern):
+                # Extract row number from filename
+                try:
+                    # Pattern: {order}_drawing_row_{row}_page{page}.png
+                    parts = filename.replace('.png', '').split('_')
+                    row_index = parts.index('row')
+                    row_number = int(parts[row_index + 1])
+
+                    image_files.append({
+                        'filename': filename,
+                        'row_number': row_number,
+                        'url': f'/api/shape-image/{order_number}/{page_number}/{row_number}'
+                    })
+                except (ValueError, IndexError):
+                    # Skip files that don't match expected pattern
+                    continue
+
+        # Sort by row number
+        image_files.sort(key=lambda x: x['row_number'])
+
+        print(f"[DEBUG] Found {len(image_files)} shape images for order {order_number}, page {page_number}")
+
+        return jsonify({
+            'success': True,
+            'order_number': order_number,
+            'page_number': page_number,
+            'images': image_files,
+            'total_images': len(image_files)
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Failed to get shape images: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'images': []
+        })
+
+@app.route('/api/shape-image/<string:order_number>/<int:page_number>/<int:row_number>')
+def serve_shape_image_by_row(order_number, page_number, row_number):
+    """Serve a specific shape image file"""
+    try:
+        # Construct the filename
+        filename = f"{order_number}_drawing_row_{row_number}_page{page_number}.png"
+
+        # Path to the shapes folder
+        shapes_folder = os.path.join('io', 'fullorder_output', 'table_detection', 'shapes')
+        file_path = os.path.join(shapes_folder, filename)
+
+        if not os.path.exists(file_path):
+            # Return a 404 error
+            abort(404)
+
+        # Serve the image file
+        return send_file(file_path, mimetype='image/png')
+
+    except Exception as e:
+        print(f"[ERROR] Failed to serve shape image: {e}")
+        abort(500)
 
 if __name__ == "__main__":
     # Create necessary directories

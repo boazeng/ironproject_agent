@@ -40,7 +40,10 @@ document.addEventListener('DOMContentLoaded', function() {
     setupEventListeners();
 
     // Load initial data if available
-    loadLatestAnalysis();
+    loadLatestAnalysis().then(() => {
+        // Auto-upload file from input folder if no file is currently loaded
+        autoUploadFromInputFolder();
+    });
 
     // Update timestamp
     updateLastUpdateTime();
@@ -96,8 +99,11 @@ function setupEventListeners() {
 
     // OCR button removed
 
-    // Shapes re-detect button
-    document.getElementById('redetect-shapes-btn').addEventListener('click', redetectShapes);
+    // Shapes re-detect button (if it exists - it was removed from the UI)
+    const redetectBtn = document.getElementById('redetect-shapes-btn');
+    if (redetectBtn) {
+        redetectBtn.addEventListener('click', redetectShapes);
+    }
 
     // File selection
     document.getElementById('select-file-btn').addEventListener('click', showFileSelection);
@@ -245,6 +251,59 @@ async function loadLatestAnalysis() {
     }
 }
 
+// Auto-upload file from input folder if no file is currently loaded
+async function autoUploadFromInputFolder() {
+    try {
+        // Always try to auto-upload if no PDF is currently visible
+        const pdfPlaceholder = document.getElementById('pdf-placeholder');
+
+        // Get list of available files
+        const response = await fetch('/api/files');
+        const data = await response.json();
+
+        if (data && data.files && data.files.length > 0) {
+            // Find the first PDF or image file
+            const file = data.files.find(f =>
+                f.name.toLowerCase().endsWith('.pdf') ||
+                f.name.toLowerCase().endsWith('.png') ||
+                f.name.toLowerCase().endsWith('.jpg') ||
+                f.name.toLowerCase().endsWith('.jpeg')
+            );
+
+            if (file) {
+                // Select and upload the file
+                const selectResponse = await fetch('/api/select-file', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ filename: file.name })
+                });
+
+                const selectData = await selectResponse.json();
+
+                if (selectData && selectData.success) {
+                    // Update current file display
+                    const currentFileEl = document.getElementById('current-file');
+                    if (currentFileEl) {
+                        currentFileEl.textContent = file.name;
+                    }
+
+                    // Load PDF if it's a PDF file
+                    if ((selectData.pdf_path || selectData.path) && file.name.toLowerCase().endsWith('.pdf')) {
+                        const pdfPath = selectData.pdf_path || `/input/${file.name}`;
+                        loadPDF(pdfPath);
+                    }
+                } else {
+                    console.error('Auto-upload failed:', selectData.error);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error in auto-upload:', error);
+    }
+}
+
 // Display analysis data in the UI
 function displayAnalysisData(data) {
     // Update header info - prioritize data.analysis.sections as it contains complete key_values
@@ -379,7 +438,6 @@ function displayAnalysisData(data) {
             // Use all_items if available, otherwise fall back to sample_items
             const items = table.all_items || table.sample_items || [];
             if (items.length > 0) {
-                let totalWeight = 0;
                 
                 items.forEach((item, index) => {
                     const row = tbody.insertRow();
@@ -393,34 +451,74 @@ function displayAnalysisData(data) {
                     if (Array.isArray(item)) {
                         // Array format: [מס', סה"כ משקל, אורך, סה"כ יח', קוטר, הערות]
                         row.insertCell(1).textContent = item[0] || (index + 1);  // מס'
-                        row.insertCell(2).textContent = '-';  // מספר קטלוגי - not available in array format
-                        row.insertCell(3).textContent = item[4] || '-';  // קוטר [mm]
-                        row.insertCell(4).textContent = item[3] || '1';  // סה"כ יח'
-                        row.insertCell(5).textContent = item[2] || '-';  // אורך [m]
+                        row.insertCell(2).textContent = '-';  // קטלוג - not available in array format
 
-                        const weight = parseFloat(item[1] || '0');
-                        row.insertCell(6).textContent = weight || '-';  // סה"כ משקל [kg]
-                        totalWeight += weight;
+                        // צורה column with shape image
+                        const shapeCell = row.insertCell(3);
+                        const orderNumber = getCurrentOrderNumber();
+                        const rowNumber = index + 1;
+                        // For displayAnalysisData, assume page 1 as default
+                        const pageNumber = 1;
 
-                        row.insertCell(7).textContent = item[5] || '-';  // הערות
+                        if (orderNumber) {
+                            const imageUrl = `/api/shape-image/${orderNumber}/${pageNumber}/${rowNumber}`;
+                            shapeCell.innerHTML = `
+                                <img src="${imageUrl}"
+                                     alt="צורה ${rowNumber}"
+                                     class="table-shape-image"
+                                     title="צורה ${rowNumber} - לחץ להגדלה"
+                                     onclick="openImageModal('${imageUrl}', 'צורה ${rowNumber}', 'עמוד ${pageNumber}')"
+                                     onerror="this.innerHTML='<span>צורה לא זמינה</span>'"
+                                     style="max-width: 100%; max-height: 80px; object-fit: contain; cursor: pointer;">
+                            `;
+                        } else {
+                            shapeCell.innerHTML = '<span>צורה לא זמינה</span>';
+                        }
+
+                        row.insertCell(4).textContent = item[4] || '-';  // קוטר [mm]
+                        row.insertCell(5).textContent = item[3] || '1';  // סה"כ יח'
+                        row.insertCell(6).textContent = item[5] || '-';  // הערות
+
+                        // Add check button
+                        const checkCell = row.insertCell(7);
+                        checkCell.innerHTML = '<button class="check-btn">✓</button>';
                     } else {
                         // Object format (fallback)
                         row.insertCell(1).textContent = item['מס\''] || item['מס'] || (index + 1);
                         row.insertCell(2).textContent = item['מספר קטלוגי'] || item['catalog'] || '-';
-                        row.insertCell(3).textContent = item['קוטר'] || item['קוטר [mm]'] || '-';
-                        row.insertCell(4).textContent = item['יחידות'] || item['units'] || item['כמות'] || item['סה"כ יח\''] || '1';
-                        row.insertCell(5).textContent = item['אורך'] || item['אורך [m]'] || '-';
 
-                        const weight = parseFloat(item['סה"כ משקל'] || item['סה"כ משקל [kg]'] || '0');
-                        row.insertCell(6).textContent = weight || '-';
-                        totalWeight += weight;
+                        // צורה column with shape image
+                        const shapeCell = row.insertCell(3);
+                        const orderNumber = getCurrentOrderNumber();
+                        const rowNumber = index + 1;
+                        // For displayAnalysisData, assume page 1 as default
+                        const pageNumber = 1;
 
-                        row.insertCell(7).textContent = item['הערות'] || '-';
+                        if (orderNumber) {
+                            const imageUrl = `/api/shape-image/${orderNumber}/${pageNumber}/${rowNumber}`;
+                            shapeCell.innerHTML = `
+                                <img src="${imageUrl}"
+                                     alt="צורה ${rowNumber}"
+                                     class="table-shape-image"
+                                     title="צורה ${rowNumber} - לחץ להגדלה"
+                                     onclick="openImageModal('${imageUrl}', 'צורה ${rowNumber}', 'עמוד ${pageNumber}')"
+                                     onerror="this.innerHTML='<span>צורה לא זמינה</span>'"
+                                     style="max-width: 100%; max-height: 80px; object-fit: contain; cursor: pointer;">
+                            `;
+                        } else {
+                            shapeCell.innerHTML = '<span>צורה לא זמינה</span>';
+                        }
+
+                        row.insertCell(4).textContent = item['קוטר'] || item['קוטר [mm]'] || '-';
+                        row.insertCell(5).textContent = item['יחידות'] || item['units'] || item['כמות'] || item['סה"כ יח\''] || '1';
+                        row.insertCell(4).textContent = item['הערות'] || '-';
+
+                        // Add check button
+                        const checkCell = row.insertCell(5);
+                        checkCell.innerHTML = '<button class="check-btn">✓</button>';
                     }
                 });
                 
-                // Update total weight
-                document.getElementById('total-weight').textContent = totalWeight.toFixed(1) + ' kg';
             } else {
                 tbody.innerHTML = '<tr><td colspan="8" class="no-data">אין נתונים להצגה</td></tr>';
             }
@@ -640,7 +738,6 @@ function displayTableItems(items, pageNumber) {
     tbody.innerHTML = '';
 
     if (items.length > 0) {
-        let totalWeight = 0;
         console.log(`📊 Displaying ${items.length} items for page ${pageNumber}`);
 
         items.forEach((item, index) => {
@@ -692,28 +789,58 @@ function displayTableItems(items, pageNumber) {
             if (Array.isArray(item)) {
                 // Array format: [מס', סה"כ משקל, אורך, סה"כ יח', קוטר, הערות]
                 createEditableCell(item[0] || (index + 1), 'מס');
-                createEditableCell('-', 'shape');  // צורה - not available in array format
+                createEditableCell('-', 'קטלוג');  // קטלוג - not available in array format
+
+                // צורה column with shape image
+                const shapeCell = row.insertCell();
+                const orderNumber = getCurrentOrderNumber();
+                const rowNumber = index + 1;
+
+                if (orderNumber) {
+                    const imageUrl = `/api/shape-image/${orderNumber}/${pageNumber}/${rowNumber}`;
+                    shapeCell.innerHTML = `
+                        <img src="${imageUrl}"
+                             alt="צורה ${rowNumber}"
+                             class="table-shape-image"
+                             title="צורה ${rowNumber} - לחץ להגדלה"
+                             onclick="openImageModal('${imageUrl}', 'צורה ${rowNumber}', 'עמוד ${pageNumber}')"
+                             onerror="this.innerHTML='<span>צורה לא זמינה</span>'"
+                             style="max-width: 100%; max-height: 80px; object-fit: contain; cursor: pointer;">
+                    `;
+                } else {
+                    shapeCell.innerHTML = '<span>צורה לא זמינה</span>';
+                }
+
                 createEditableCell(item[4] || '-', 'קוטר');
                 createEditableCell(item[3] || '1', 'סהכ יחידות');
-                createEditableCell(item[2] || '-', 'אורך');
-
-                const weight = parseFloat(item[1] || '0');
-                createEditableCell(weight || '-', 'משקל');
-                totalWeight += weight;
-
                 createEditableCell(item[5] || '-', 'הערות');
             } else {
                 // Object format - now handles OCR data structure properly
                 createEditableCell(item['מס'] || item['מס\''] || (index + 1), 'מס');
-                createEditableCell(item['shape'] || item['צורה'] || '-', 'shape');
+                createEditableCell(item['קטלוג'] || item['catalog'] || '-', 'קטלוג');
+
+                // צורה column with shape image
+                const shapeCell = row.insertCell();
+                const orderNumber = getCurrentOrderNumber();
+                const rowNumber = index + 1;
+
+                if (orderNumber) {
+                    const imageUrl = `/api/shape-image/${orderNumber}/${pageNumber}/${rowNumber}`;
+                    shapeCell.innerHTML = `
+                        <img src="${imageUrl}"
+                             alt="צורה ${rowNumber}"
+                             class="table-shape-image"
+                             title="צורה ${rowNumber} - לחץ להגדלה"
+                             onclick="openImageModal('${imageUrl}', 'צורה ${rowNumber}', 'עמוד ${pageNumber}')"
+                             onerror="this.innerHTML='<span>צורה לא זמינה</span>'"
+                             style="max-width: 100%; max-height: 80px; object-fit: contain; cursor: pointer;">
+                    `;
+                } else {
+                    shapeCell.innerHTML = '<span>צורה לא זמינה</span>';
+                }
+
                 createEditableCell(item['קוטר'] || '-', 'קוטר');
                 createEditableCell(item['סהכ יחידות'] || item['יחידות'] || item['units'] || item['כמות'] || '1', 'סהכ יחידות');
-                createEditableCell(item['אורך'] || '-', 'אורך');
-
-                const weight = parseFloat(item['משקל'] || item['סה"כ משקל'] || '0');
-                createEditableCell(weight || '-', 'משקל');
-                totalWeight += weight;
-
                 createEditableCell(item['הערות'] || '-', 'הערות');
             }
 
@@ -752,21 +879,288 @@ function displayTableItems(items, pageNumber) {
             checkCell.style.textAlign = 'center';
         });
 
-        // Update total weight and row count
-        document.getElementById('total-weight').textContent = totalWeight.toFixed(1) + ' kg';
+        // Update row count
         document.getElementById('total-rows').textContent = items.length;
 
-        console.log(`✅ Table updated: ${items.length} items, total weight: ${totalWeight.toFixed(1)} kg`);
+        console.log(`✅ Table updated: ${items.length} items`);
 
         // Initialize row lock states after table is rendered
         setTimeout(() => {
             initializeRowLockStates();
         }, 100);
+
+        // Update shapes display for current page
+        updateShapesDisplay(items, pageNumber);
     } else {
         tbody.innerHTML = '<tr><td colspan="9" class="no-data">אין נתונים להצגה עבור עמוד ' + pageNumber + '</td></tr>';
         document.getElementById('total-weight').textContent = '0 kg';
         document.getElementById('total-rows').textContent = '0';
         console.log(`📄 No data to display for page ${pageNumber}`);
+
+        // Clear shapes display when no data
+        updateShapesDisplay([], pageNumber);
+    }
+}
+
+// Update shapes display for current page
+async function updateShapesDisplay(items, pageNumber) {
+    const shapesTable = document.getElementById('shapes-table');
+    const shapesBody = document.getElementById('shapes-tbody');
+
+    if (!shapesTable || !shapesBody) {
+        console.log('❌ Shapes table elements not found');
+        return;
+    }
+
+    // Check if we already have shape images loaded for this page
+    const currentPageAttr = shapesTable.getAttribute('data-current-page');
+    if (currentPageAttr === String(pageNumber)) {
+        // Already showing shapes for this page, don't reload
+        console.log(`📐 Shape images already loaded for page ${pageNumber}`);
+        return;
+    }
+
+    // Get current order number
+    const orderNumber = getCurrentOrderNumber();
+    if (!orderNumber) {
+        console.log('❌ No order number available for shape images');
+        shapesBody.innerHTML = `<tr><td colspan="4" class="no-shapes-placeholder">לא נמצאו תמונות צורות</td></tr>`;
+        return;
+    }
+
+    // Clear table body and set current page
+    shapesBody.innerHTML = '';
+    shapesTable.setAttribute('data-current-page', pageNumber);
+
+    // Fetch shape images for this page
+    let shapeImages = [];
+    try {
+        const response = await fetch(`/api/shape-images/${orderNumber}/${pageNumber}`);
+        const imageData = await response.json();
+        if (imageData.success) {
+            shapeImages = imageData.images || [];
+        }
+    } catch (error) {
+        console.log('Could not fetch shape images:', error);
+    }
+
+    // Update summary section
+    const totalShapesEl = document.getElementById('total-shapes');
+    const currentPageEl = document.getElementById('current-shapes-page');
+    const statusEl = document.getElementById('shapes-status');
+
+    if (totalShapesEl) totalShapesEl.textContent = shapeImages.length;
+    if (currentPageEl) currentPageEl.textContent = pageNumber;
+    if (statusEl) {
+        statusEl.textContent = shapeImages.length > 0 ? 'זוהו צורות' : 'לא נמצאו צורות';
+    }
+
+    console.log(`📐 Found ${shapeImages.length} shapes for page ${pageNumber}`);
+
+    if (shapeImages.length > 0) {
+        // Create table rows for each shape
+        shapeImages.forEach((image, index) => {
+            const rowId = `shape-row-${pageNumber}-${index + 1}`;
+
+            // Create main data row
+            const mainRow = document.createElement('tr');
+            mainRow.className = 'shape-table-row';
+            mainRow.innerHTML = `
+                <td class="shape-page-row">
+                    <div>${pageNumber}/${index + 1}</div>
+                </td>
+                <td class="shape-catalog-input-cell">
+                    <input type="text"
+                           class="catalog-input"
+                           id="catalog-input-${rowId}"
+                           data-row-id="${rowId}"
+                           maxlength="5"
+                           placeholder=""
+                           pattern="[0-9]{1,5}"
+                           title="הכנס מספר קטלוג (1-5 ספרות)"
+                           style="width: 100%; text-align: center; font-size: 12px; padding: 2px; border: 1px solid #ccc; background: white;">
+                    <div class="rib-count-container" style="margin-top: 4px;">
+                        <input type="text" class="rib-field rib-count" maxlength="2" style="width: 40px;" placeholder="מס׳ צלעות">
+                    </div>
+                </td>
+                <td class="shape-drawing-cell">
+                    <img src="${image.url}" alt="צורה ${index + 1}"
+                         class="shape-table-image"
+                         title="צורה ${index + 1} - לחץ להגדלה"
+                         onclick="openImageModal('${image.url}', 'צורה ${index + 1}', 'עמוד ${pageNumber}')"
+                         onerror="this.style.display='none'">
+                </td>
+                <td class="shape-catalog-cell" id="catalog-image-${rowId}">
+                    <div class="catalog-shape-placeholder">
+                        <span>הכנס מספר קטלוג</span>
+                    </div>
+                </td>
+            `;
+
+
+            // Create rib fields HTML - First row: R1-R6, Second row: R7-R8 (under R1-R2)
+            // Each rib now has 3 fields: Rib, Length, Angle grouped together with spacing
+            let ribFieldsRow1Html = '';
+            let ribFieldsRow2Html = '';
+
+            // First row: R1-R6 (6 sets of 3 fields each)
+            for (let i = 0; i < 6; i++) {
+                ribFieldsRow1Html += `
+                    <span class="rib-set">
+                        <input type="text" class="rib-field rib-number" maxlength="2" style="width: 20px; margin-right: 1px;" placeholder="R${i+1}">
+                        <input type="text" class="rib-field rib-length" maxlength="6" style="width: 40px; margin-right: 1px;" placeholder="L${i+1}">
+                        <input type="text" class="rib-field rib-angle" maxlength="3" style="width: 30px;" placeholder="A${i+1}">
+                    </span>
+                    ${i < 5 ? '<span style="margin-right: 6px;"></span>' : ''}
+                `;
+            }
+
+            // Second row: R7-R8 positioned exactly under R1-R2
+            for (let i = 6; i < 8; i++) {
+                ribFieldsRow2Html += `
+                    <span class="rib-set">
+                        <input type="text" class="rib-field rib-number" maxlength="2" style="width: 20px; margin-right: 1px;" placeholder="R${i+1}">
+                        <input type="text" class="rib-field rib-length" maxlength="6" style="width: 40px; margin-right: 1px;" placeholder="L${i+1}">
+                        <input type="text" class="rib-field rib-angle" maxlength="3" style="width: 30px;" placeholder="A${i+1}">
+                    </span>
+                    ${i < 7 ? '<span style="margin-right: 6px;"></span>' : ''}
+                `;
+            }
+
+            // Add empty space to align R7 under R1, R8 under R2 (fill remaining space)
+            ribFieldsRow2Html += `<span style="width: ${4 * (20 + 1 + 40 + 1 + 30 + 6)}px; display: inline-block;"></span>`;
+
+            // Create first rib fields row
+            const ribRow1 = document.createElement('tr');
+            ribRow1.className = 'shape-rib-row';
+            ribRow1.innerHTML = `
+                <td colspan="4" class="rib-fields-cell" style="padding: 4px 8px;">
+                    <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; font-size: 11px;">
+                        ${Array.from({length: 6}, (_, i) => `
+                            <div class="rib-set rib-set-${i+1}" id="rib-set-${rowId}-${i+1}" style="display: none; gap: 1px; position: relative;">
+                                ${i === 0 ? '<div style="position: absolute; top: -28px; left: 0; font-size: 10px; color: #666; white-space: nowrap;">אורכי צלע וזוויות:</div>' : ''}
+                                <input type="text" class="rib-field rib-number" maxlength="2" style="width: 20px;" placeholder="R${i+1}">
+                                <input type="text" class="rib-field rib-length" maxlength="6" style="width: 40px;" placeholder="L${i+1}">
+                                <input type="text" class="rib-field rib-angle" maxlength="3" style="width: 30px;" placeholder="A${i+1}">
+                            </div>
+                        `).join('')}
+                    </div>
+                </td>
+            `;
+
+            // Create second rib fields row
+            const ribRow2 = document.createElement('tr');
+            ribRow2.className = 'shape-rib-row';
+            ribRow2.innerHTML = `
+                <td colspan="4" class="rib-fields-cell" style="padding: 4px 8px; border-top: none; position: relative;">
+                    <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; font-size: 11px;">
+                        ${Array.from({length: 6}, (_, i) => {
+                            if (i < 2) {
+                                return `
+                                    <div class="rib-set" id="rib-set-${rowId}-${i+7}" style="display: none; gap: 1px;">
+                                        <input type="text" class="rib-field rib-number" maxlength="2" style="width: 20px;" placeholder="R${i+7}">
+                                        <input type="text" class="rib-field rib-length" maxlength="6" style="width: 40px;" placeholder="L${i+7}">
+                                        <input type="text" class="rib-field rib-angle" maxlength="3" style="width: 30px;" placeholder="A${i+7}">
+                                    </div>
+                                `;
+                            } else {
+                                return '<div></div>'; // Empty grid cell
+                            }
+                        }).join('')}
+                    </div>
+                    <div style="position: absolute; bottom: -3px; left: 0; right: 0; height: 2px; background-color: #2196F3; z-index: 10;"></div>
+                </td>
+            `;
+
+            // Append all rows
+            shapesBody.appendChild(mainRow);
+            shapesBody.appendChild(ribRow1);
+            shapesBody.appendChild(ribRow2);
+
+            // Add event listener for catalog input
+            const catalogInput = document.getElementById(`catalog-input-${rowId}`);
+            catalogInput.addEventListener('input', function() {
+                updateCatalogImage(this.value, rowId);
+            });
+
+            // Add event listener for rib count input
+            const ribCountInput = document.querySelector(`#catalog-input-${rowId}`).parentElement.querySelector('.rib-count');
+            ribCountInput.addEventListener('input', function() {
+                updateRibFieldsVisibility(this.value, rowId);
+            });
+        });
+    } else {
+        // No images found
+        shapesBody.innerHTML = `
+            <tr>
+                <td colspan="4" class="no-shapes-placeholder">
+                    <p>🔍 לא נמצאו תמונות צורות בעמוד ${pageNumber}</p>
+                </td>
+            </tr>
+        `;
+    }
+
+    console.log(`📐 Shape images displayed: ${shapeImages.length} images found for page ${pageNumber}`);
+}
+
+// Update rib fields visibility based on number of ribs
+function updateRibFieldsVisibility(ribCount, rowId) {
+    const count = parseInt(ribCount) || 0;
+
+    // Show/hide rib fields based on count (1-8 ribs max)
+    for (let i = 1; i <= 8; i++) {
+        const ribSet = document.getElementById(`rib-set-${rowId}-${i}`);
+        if (ribSet) {
+            if (i <= count) {
+                ribSet.style.display = 'flex';
+            } else {
+                ribSet.style.display = 'none';
+            }
+        }
+    }
+}
+
+// Open image modal for shape images
+function openImageModal(imageUrl, shapeName, lineInfo) {
+    // Remove any existing modal
+    const existingModal = document.getElementById('image-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.id = 'image-modal';
+    modal.className = 'image-modal-overlay';
+    modal.innerHTML = `
+        <div class="image-modal-content">
+            <div class="image-modal-header">
+                <h3>צורה: ${shapeName}</h3>
+                <p>${lineInfo}</p>
+                <button class="image-modal-close" onclick="closeImageModal()">&times;</button>
+            </div>
+            <div class="image-modal-body">
+                <img src="${imageUrl}" alt="צורה" class="image-modal-img">
+            </div>
+        </div>
+    `;
+
+    // Add click outside to close
+    modal.addEventListener('click', function(e) {
+        if (e.target === modal) {
+            closeImageModal();
+        }
+    });
+
+    // Add to body
+    document.body.appendChild(modal);
+}
+
+// Close image modal
+function closeImageModal() {
+    const modal = document.getElementById('image-modal');
+    if (modal) {
+        modal.remove();
     }
 }
 
@@ -936,7 +1330,7 @@ function toggleRow(rowId) {
         expandedRow.setAttribute('data-expanded-for', rowId);
         
         const expandedCell = expandedRow.insertCell(0);
-        expandedCell.colSpan = 8;
+        expandedCell.colSpan = 10;
         
         // Create rib details table
         expandedCell.innerHTML = `
@@ -1281,8 +1675,10 @@ async function runOCRAnalysis() {
 
 async function redetectShapes() {
     const redetectBtn = document.getElementById('redetect-shapes-btn');
+    if (!redetectBtn) return; // Button was removed
+
     const originalContent = redetectBtn.innerHTML;
-    const columnName = document.getElementById('shape-column-name').value || 'צורה';
+    const columnName = 'צורה'; // Default value since input was removed
 
     try {
         // Disable button and show loading state
@@ -1334,15 +1730,36 @@ async function redetectShapes() {
 
 // Display shapes detected by GLOBAL agent
 function displayShapes(data) {
-    const shapesContainer = document.getElementById('shapes-container');
-    const shapesCount = document.getElementById('shapes-count');
-    
+    const shapesTable = document.getElementById('shapes-table');
+    const shapesBody = document.getElementById('shapes-tbody');
+
+    // Check if we're using the old container or new table format
+    if (!shapesTable || !shapesBody) {
+        // Fall back to old container if table not found
+        const shapesContainer = document.getElementById('shapes-container');
+        if (!shapesContainer) return;
+
+        // Don't clear shapes if we already have shape images displayed
+        const hasShapeImages = shapesContainer.querySelector('.shape-table-row') !== null;
+        if (hasShapeImages) {
+            console.log('📐 Shape images already displayed, skipping displayShapes');
+            return;
+        }
+    } else {
+        // Using new table format - check if already populated
+        const hasTableRows = shapesBody.querySelector('.shape-table-row') !== null;
+        if (hasTableRows) {
+            console.log('📐 Shape table already populated, skipping displayShapes');
+            return;
+        }
+    }
+
     // Check if detailed shape info is available (new format)
     if (data.shape_cells && data.shape_cells.length > 0) {
         const shapes = data.shape_cells;
         
-        // Update count
-        shapesCount.textContent = `${shapes.length} צורות נמצאו`;
+        // No longer updating count since element was removed
+        console.log(`📐 Found ${shapes.length} shapes`);
         
         // Clear container
         shapesContainer.innerHTML = '';
@@ -1389,8 +1806,8 @@ function displayShapes(data) {
         // Fallback to old format (backward compatibility)
         const shapes = data.shape_cell_paths;
         
-        // Update count
-        shapesCount.textContent = `${shapes.length} צורות נמצאו`;
+        // No longer updating count since element was removed
+        console.log(`📐 Found ${shapes.length} shapes`);
         
         // Clear container
         shapesContainer.innerHTML = '';
@@ -1427,7 +1844,7 @@ function displayShapes(data) {
         
     } else {
         // No shapes found
-        shapesCount.textContent = '0 צורות נמצאו';
+        console.log('📐 No shapes found');
         shapesContainer.innerHTML = `
             <div class="no-shapes-placeholder">
                 <p>🔍 לא נמצאו צורות</p>
@@ -1579,10 +1996,35 @@ function formatDate(dateString) {
     });
 }
 
-// Auto-refresh every 30 seconds
+// Auto-refresh every 30 seconds (but preserve shape images)
 setInterval(() => {
     if (document.getElementById('status').textContent !== 'מעבד') {
-        loadLatestAnalysis();
+        // Store current shape table state before refresh
+        const shapesTable = document.getElementById('shapes-table');
+        const shapesBody = document.getElementById('shapes-tbody');
+        const currentShapeRows = shapesBody ? shapesBody.innerHTML : '';
+        const currentPageAttr = shapesTable ? shapesTable.getAttribute('data-current-page') : null;
+
+        loadLatestAnalysis().then(() => {
+            // Restore shapes if they were cleared
+            if (currentShapeRows && currentShapeRows !== '' &&
+                !currentShapeRows.includes('no-shapes-placeholder')) {
+                const tbody = document.getElementById('shapes-tbody');
+                const table = document.getElementById('shapes-table');
+                if (tbody) {
+                    // Check if shapes were cleared or changed
+                    const newContent = tbody.innerHTML;
+                    if (newContent.includes('no-shapes-placeholder') || newContent === '') {
+                        // Restore the shape rows
+                        tbody.innerHTML = currentShapeRows;
+                        if (currentPageAttr && table) {
+                            table.setAttribute('data-current-page', currentPageAttr);
+                        }
+                        console.log('📐 Restored shape table after auto-refresh');
+                    }
+                }
+            }
+        });
     }
 }, 30000);
 
@@ -2407,16 +2849,7 @@ async function saveTableCell(pageNumber, rowIndex, fieldName, newValue) {
     }
 }
 
-// Update total weight calculation
-function updateTotalWeight() {
-    let totalWeight = 0;
-    const weightInputs = document.querySelectorAll('.table-editable[data-field="משקל"]');
-    weightInputs.forEach(input => {
-        const weight = parseFloat(input.value) || 0;
-        totalWeight += weight;
-    });
-    document.getElementById('total-weight').textContent = totalWeight.toFixed(1) + ' kg';
-}
+// Total weight calculation removed - משקל column no longer exists
 
 // Save all table data
 async function saveAllTableData() {
@@ -2517,3 +2950,42 @@ document.addEventListener('DOMContentLoaded', function() {
     // Small delay to ensure all content is loaded
     setTimeout(initializeRowLockStates, 100);
 });
+
+// Update catalog image based on catalog number input
+function updateCatalogImage(catalogNumber, rowId) {
+    const catalogImageCell = document.getElementById(`catalog-image-${rowId}`);
+
+    if (!catalogImageCell) return;
+
+    // Remove leading zeros and check if it's a valid number (1-5 digits)
+    const cleanNumber = catalogNumber.replace(/^0+/, '') || '0';
+
+    if (catalogNumber.length >= 1 && catalogNumber.length <= 5 && /^\d+$/.test(catalogNumber)) {
+        // Valid number (1-5 digits) - show catalog image
+        const imageUrl = `/catalog_image/${cleanNumber.padStart(3, '0')}`;
+
+        catalogImageCell.innerHTML = `
+            <img src="${imageUrl}"
+                 alt="קטלוג ${catalogNumber}"
+                 class="catalog-table-image"
+                 title="צורת קטלוג ${catalogNumber} - לחץ להגדלה"
+                 onclick="openImageModal('${imageUrl}', 'צורת קטלוג ${catalogNumber}', 'קטלוג')"
+                 onerror="this.parentElement.innerHTML='<div class=\\'catalog-shape-placeholder\\'><span>קטלוג לא נמצא</span></div>'"
+                 style="max-width: 100%; max-height: 120px; object-fit: contain; border: 1px solid #e0e0e0; border-radius: 4px; background: white;">
+        `;
+    } else if (catalogNumber.length === 0) {
+        // Empty input - show placeholder
+        catalogImageCell.innerHTML = `
+            <div class="catalog-shape-placeholder">
+                <span>הכנס מספר קטלוג</span>
+            </div>
+        `;
+    } else {
+        // Invalid input - show waiting message
+        catalogImageCell.innerHTML = `
+            <div class="catalog-shape-placeholder">
+                <span>הכנס מספר תקין</span>
+            </div>
+        `;
+    }
+}

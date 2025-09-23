@@ -3,10 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- CACHE BUST: 2025-09-21-21:53 -->
+    <!-- CACHE BUST: 2025-09-21-23:15 - FORCE TEMPLATE RELOAD -->
     <title>מערכת ניתוח הזמנות ברזל - IRONMAN</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Fix PDF.js worker error
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    </script>
 </head>
 <body>
     <!-- Main Header -->
@@ -97,107 +101,90 @@
         <div class="column data-column">
             <div class="column-header">
                 <div class="header-top">
-                    <h2>פרטי הזמנה</h2>
-                    <div class="header-buttons">
-                        <button id="clear-header-btn" class="btn btn-small btn-secondary">
-                            <span class="btn-icon">🗑️</span>
-                            נקה נתונים
-                        </button>
-                        <button id="redetect-header-btn" class="btn btn-small btn-primary">
-                            <span class="btn-icon">🔄</span>
-                            זיהוי מחדש
-                        </button>
-                        <button id="run-ocr-btn" class="btn btn-small btn-secondary">
-                            <span class="btn-icon">🔍</span>
-                            OCR חכם
-                        </button>
-                    </div>
+                    <h2 style="text-align: center;">
+                        פרטי הזמנה <span id="title-page-display" style="background: blue; color: white; padding: 3px 6px; border-radius: 8px; font-size: 12px; margin-right: 20px;">עמוד -</span>
+                    </h2>
                 </div>
                 <div class="data-tabs">
-                    <button class="tab-btn active" data-tab="header">כותרת</button>
-                    <button class="tab-btn" data-tab="table">טבלת הזמנות</button>
+                    <button class="tab-btn" data-tab="header">כותרת</button>
+                    <button class="tab-btn active" data-tab="table">טבלת הזמנות</button>
                     <button class="tab-btn" data-tab="shapes">צורות</button>
                     <button class="tab-btn" data-tab="raw">נתונים גולמיים</button>
                 </div>
             </div>
             
             <!-- Header Tab Content -->
-            <div id="header-tab" class="tab-content active">
-                <!-- Order Header Image Section - MOVED TO TOP -->
-                <div class="header-image-section" id="header-image-section" style="display: block !important; visibility: visible !important; border: 2px solid red; background-color: yellow; padding: 20px; margin: 20px 0;">
-                    <div class="section-header">
-                        <h4>🖼️ תמונת כותרת הזמנה מעמוד 1 🖼️</h4>
-                    </div>
-                    <div class="header-image-container">
-                        <img id="order-header-image" src="/order_header_image/CO25S006375_order_title_page1_order_header.png" alt="תמונת כותרת הזמנה" class="header-image" style="display: block;" />
-                        <div id="no-header-image" class="placeholder" style="display: none;">
-                            <p>📋 אין תמונת כותרת זמינה</p>
-                            <p>הרץ ניתוח כדי לזהות כותרת מהמסמך</p>
-                        </div>
-                    </div>
-                </div>
-
+            <div id="header-tab" class="tab-content">
                 <div class="data-section">
-                    <div class="data-grid" id="header-data">
-                        <div class="data-row">
-                            <span class="data-label">מספר הזמנה:</span>
-                            <input class="data-editable" id="detail-order-number" type="text" placeholder="-" data-field="orderNumber">
+                    <div class="data-grid" id="header-data" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-width: 100%;">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">מספר הזמנה:</span>
+                            <input class="data-editable" id="detail-order-number" type="text" placeholder="-" data-field="orderNumber" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
-                        <div class="data-row">
-                            <span class="data-label">לקוח/פרויקט:</span>
-                            <input class="data-editable" id="detail-customer" type="text" placeholder="-" data-field="customer">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">לקוח/פרויקט:</span>
+                            <input class="data-editable" id="detail-customer" type="text" placeholder="-" data-field="customer" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
-                        <div class="data-row">
-                            <span class="data-label">שם התוכנית:</span>
-                            <input class="data-editable" id="detail-program-name" type="text" placeholder="-" data-field="programName">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">שם התוכנית:</span>
+                            <input class="data-editable" id="detail-program-name" type="text" placeholder="-" data-field="programName" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
-                        <div class="data-row">
-                            <span class="data-label">איש קשר:</span>
-                            <input class="data-editable" id="detail-contact" type="text" placeholder="-" data-field="contact">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">איש קשר:</span>
+                            <input class="data-editable" id="detail-contact" type="text" placeholder="-" data-field="contact" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
-                        <div class="data-row">
-                            <span class="data-label">טלפון:</span>
-                            <input class="data-editable" id="detail-phone" type="text" placeholder="-" data-field="phone">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">טלפון:</span>
+                            <input class="data-editable" id="detail-phone" type="text" placeholder="-" data-field="phone" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
-                        <div class="data-row">
-                            <span class="data-label">כתובת האתר:</span>
-                            <input class="data-editable" id="detail-address" type="text" placeholder="-" data-field="address">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">כתובת האתר:</span>
+                            <input class="data-editable" id="detail-address" type="text" placeholder="-" data-field="address" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
-                        <div class="data-row">
-                            <span class="data-label">משקל כולל:</span>
-                            <input class="data-editable" id="detail-weight" type="text" placeholder="-" data-field="weight">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">משקל כולל:</span>
+                            <input class="data-editable" id="detail-weight" type="text" placeholder="-" data-field="weight" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
-                        <div class="data-row">
-                            <span class="data-label">תאריך הזמנה:</span>
-                            <input class="data-editable" id="detail-order-date" type="text" placeholder="-" data-field="orderDate">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">תאריך הזמנה:</span>
+                            <input class="data-editable" id="detail-order-date" type="text" placeholder="-" data-field="orderDate" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
-                        <div class="data-row">
-                            <span class="data-label">תאריך אספקה:</span>
-                            <input class="data-editable" id="detail-delivery-date" type="text" placeholder="-" data-field="deliveryDate">
+                        <div class="data-row" style="padding: 4px 0;">
+                            <span class="data-label" style="display: inline-block; width: 110px; font-size: 13px;">תאריך אספקה:</span>
+                            <input class="data-editable" id="detail-delivery-date" type="text" placeholder="-" data-field="deliveryDate" style="width: calc(100% - 115px); font-size: 13px; padding: 2px 4px;">
                         </div>
                     </div>
                     <div class="auto-save-info">
                         <span id="save-status"></span>
                     </div>
                 </div>
+
+                <!-- Order Header Image Section - After Data -->
+                <div class="header-image-section" style="margin-top: 15px;">
+                    <h3 style="text-align: center; margin-bottom: 10px; color: #333; font-size: 16px;">כותרת הזמנה</h3>
+                    <div class="header-image-container" style="text-align: center;">
+                        <img id="order-header-image" src="/order_header_image/CO25S006375_order_title_page1_order_header.png"
+                             alt="כותרת הזמנה"
+                             style="width: 95%; max-width: 100%; height: auto; border: 1px solid #ddd; border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);" />
+                    </div>
+                </div>
             </div>
 
             <!-- Table Tab Content -->
-            <div id="table-tab" class="tab-content">
+            <div id="table-tab" class="tab-content active">
                 <div class="data-section">
-                    <h3>פריטי הזמנה</h3>
                     <div class="table-container">
                         <table id="items-table">
                             <thead>
                                 <tr>
-                                    <th width="5%"></th>
-                                    <th width="8%">מס'</th>
-                                    <th width="12%">מספר קטלוגי</th>
+                                    <th width="4%"></th>
+                                    <th width="6%">מס'</th>
+                                    <th width="10%">קטלוג</th>
+                                    <th width="30%">צורה</th>
                                     <th width="10%">קוטר (mm)</th>
                                     <th width="10%">יחידות</th>
-                                    <th width="10%">אורך (m)</th>
-                                    <th width="12%">משקל (kg)</th>
-                                    <th width="33%">הערות</th>
+                                    <th width="24%">הערות</th>
+                                    <th width="6%">בדוק</th>
                                 </tr>
                             </thead>
                             <tbody id="items-tbody">
@@ -216,10 +203,6 @@
                             <span>סוג הזמנה:</span>
                             <span id="order-type">-</span>
                         </div>
-                        <div class="summary-item">
-                            <span>סה"כ משקל:</span>
-                            <span id="total-weight">0 kg</span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -227,26 +210,46 @@
             <!-- Shapes Tab Content -->
             <div id="shapes-tab" class="tab-content">
                 <div class="data-section">
-                    <div class="section-header">
-                        <h3>צורות שזוהו</h3>
-                        <div class="shapes-info">
-                            <span id="shapes-count">0 צורות נמצאו</span>
-                        </div>
-                        <div class="shapes-controls">
-                            <div class="column-input-group">
-                                <label for="shape-column-name">עמודת צורות:</label>
-                                <input type="text" id="shape-column-name" placeholder="צורה" value="צורה" class="column-input">
+                    <div class="shapes-container" id="shapes-container">
+                        <div class="shapes-table-wrapper">
+                            <!-- Fixed Header -->
+                            <table class="shapes-table shapes-header-table">
+                                <thead>
+                                    <tr>
+                                        <th width="8%">עמוד/שורה</th>
+                                        <th width="15%">קטלוג</th>
+                                        <th width="38%">ציור צורה</th>
+                                        <th width="39%">צורת קטלוג</th>
+                                    </tr>
+                                </thead>
+                            </table>
+                            <!-- Scrollable Body -->
+                            <div class="shapes-body-container">
+                                <table class="shapes-table shapes-body-table" id="shapes-table">
+                                    <tbody id="shapes-tbody">
+                                        <tr>
+                                            <td colspan="4" class="no-shapes-placeholder">
+                                                <p>🔍 לא נמצאו צורות</p>
+                                                <p>הרץ ניתוח כדי לזהות צורות מהמסמך</p>
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
-                            <button id="redetect-shapes-btn" class="btn btn-small btn-primary">
-                                <span class="btn-icon">🔄</span>
-                                זיהוי מחדש
-                            </button>
                         </div>
                     </div>
-                    <div class="shapes-container" id="shapes-container">
-                        <div class="no-shapes-placeholder">
-                            <p>🔍 לא נמצאו צורות</p>
-                            <p>הרץ ניתוח כדי לזהות צורות מהמסמך</p>
+                    <div class="table-summary">
+                        <div class="summary-item">
+                            <span>סה"כ צורות:</span>
+                            <span id="total-shapes">0</span>
+                        </div>
+                        <div class="summary-item">
+                            <span>עמוד נוכחי:</span>
+                            <span id="current-shapes-page">-</span>
+                        </div>
+                        <div class="summary-item">
+                            <span>סטטוס זיהוי:</span>
+                            <span id="shapes-status">-</span>
                         </div>
                     </div>
                 </div>
@@ -294,6 +297,34 @@
         </div>
     </footer>
 
-    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v={{ range(1000000000, 9999999999) | random }}"></script>
+
+    <!-- INLINE TEST SCRIPT -->
+    <script>
+    console.log('🔥 INLINE SCRIPT RUNNING - TEST FOR PAGE ELEMENTS');
+    setTimeout(() => {
+        console.log('🔥 INLINE: Manual DOM check after 3 seconds...');
+        const tableEl = document.getElementById('current-page-display');
+        const titleEl = document.getElementById('title-page-display');
+        console.log('🔥 INLINE: Table element:', tableEl);
+        console.log('🔥 INLINE: Title element:', titleEl);
+        if (tableEl) {
+            console.log('🔥 INLINE: ✅ Table element found! Setting to עמוד 1');
+            tableEl.textContent = 'עמוד 1';
+            tableEl.style.backgroundColor = 'blue';
+            tableEl.style.color = 'white';
+            tableEl.style.padding = '5px';
+            tableEl.style.borderRadius = '10px';
+        } else {
+            console.log('🔥 INLINE: ❌ Table element NOT found');
+        }
+        if (titleEl) {
+            console.log('🔥 INLINE: ✅ Title element found! Setting to עמוד 1');
+            titleEl.textContent = 'עמוד 1';
+        } else {
+            console.log('🔥 INLINE: ❌ Title element NOT found');
+        }
+    }, 3000);
+    </script>
 </body>
 </html>
