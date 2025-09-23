@@ -28,6 +28,8 @@ from agents.llm_agents.format1_agent.form1s4 import Form1S4Agent
 from agents.llm_agents.format1_agent.form1s4_1 import Form1S4_1Agent
 from agents.llm_agents.format1_agent.form1s5 import Form1S5Agent
 from agents.llm_agents.format1_agent.form1ocr1 import Form1OCR1Agent
+from agents.llm_agents.format1_agent.form1ocr2 import Form1OCR2Agent
+from agents.llm_agents.format1_agent.form1dat1 import Form1Dat1Agent
 
 # Configure logging
 logging.basicConfig(
@@ -58,6 +60,8 @@ class TableDetectionPipeline:
             "form1s4": None,
             "form1s5": None,
             "form1ocr1": None,
+            "form1ocr2": None,
+            "form1dat1": None,
             "errors": []
         }
 
@@ -413,17 +417,17 @@ class TableDetectionPipeline:
             form1s3_2_agent = Form1S32Agent()
             print(f"[FORM1S3.2] Agent initialized: {form1s3_2_agent.name}")
 
-            # Look for table_body.png from form1s3.1 output with page number
-            table_body_files = glob.glob(f"{self.output_dir}/table_detection/table/*_table_body_page1.png")
+            # Look for table_bodyonly.png from form1s3.1 output with page number
+            table_body_files = glob.glob(f"{self.output_dir}/table_detection/table/*_table_bodyonly_page1.png")
 
             if not table_body_files:
-                print(f"[FORM1S3.2] table_body.png not found at {self.output_dir}/table_detection/table/*_table_body_page1.png")
+                print(f"[FORM1S3.2] table_bodyonly.png not found at {self.output_dir}/table_detection/table/*_table_bodyonly_page1.png")
                 self.results["form1s3_2"] = {"status": "no_files"}
                 return True
 
             table_body_path = table_body_files[0]  # Use first matching file
 
-            print(f"[FORM1S3.2] Found table_body.png, processing order line counting")
+            print(f"[FORM1S3.2] Found table_bodyonly.png, processing order line counting")
 
             # Set output directory (same as table_body.png)
             output_dir = f"{self.output_dir}/table_detection/table"
@@ -884,8 +888,8 @@ class TableDetectionPipeline:
         """Process single page with Form1S3.2 agent"""
         try:
             form1s3_2_agent = Form1S32Agent()
-            # Look for table_body file for this page
-            table_body_pattern = f"{self.output_dir}/table_detection/table/*_table_body_page{page_number}.png"
+            # Look for table_bodyonly file for this page
+            table_body_pattern = f"{self.output_dir}/table_detection/table/*_table_bodyonly_page{page_number}.png"
             table_body_files = glob.glob(table_body_pattern)
 
             if not table_body_files:
@@ -1162,6 +1166,187 @@ class TableDetectionPipeline:
             self.results["errors"].append(error_msg)
             return False
 
+    def process_with_form1ocr2(self):
+        """Process table bodies with Form1OCR2 agent for table OCR extraction"""
+        self.print_section("STEP 7: TABLE OCR PROCESSING (FORM1OCR2)")
+
+        try:
+            # Initialize Form1OCR2 agent
+            form1ocr2_agent = Form1OCR2Agent()
+            print(f"[FORM1OCR2] Agent initialized: {form1ocr2_agent.short_name}")
+
+            # Look for table_bodyonly files from form1s3.1 output
+            table_bodyonly_files = glob.glob(f"{self.output_dir}/table_detection/table/*_table_bodyonly_page*.png")
+
+            if not table_bodyonly_files:
+                print(f"[FORM1OCR2] No table_bodyonly files found at {self.output_dir}/table_detection/table/")
+                self.results["form1ocr2"] = {"status": "no_files"}
+                return True
+
+            print(f"[FORM1OCR2] Found {len(table_bodyonly_files)} table_bodyonly files to process")
+
+            # Process each table_bodyonly file
+            processed_files = []
+            successful_files = 0
+            failed_files = 0
+
+            for table_file in table_bodyonly_files:
+                file_name = os.path.basename(table_file)
+                print(f"[FORM1OCR2] Processing: {file_name}")
+
+                try:
+                    # Extract order number and page number from filename
+                    import re
+                    match = re.search(r'(.+)_table_bodyonly_page(\d+)\.png$', file_name)
+                    if not match:
+                        print(f"[FORM1OCR2] [ERROR] {file_name}: Could not extract order/page info")
+                        failed_files += 1
+                        continue
+
+                    order_number = match.group(1)
+                    page_number = match.group(2)
+
+                    # Process with Form1OCR2 agent
+                    result = form1ocr2_agent.process_page(order_number, page_number)
+
+                    if result and result.get("status") == "success":
+                        print(f"[FORM1OCR2] [SUCCESS] {file_name}")
+                        print(f"[FORM1OCR2]   OCR output: {result.get('output_file', 'N/A')}")
+                        successful_files += 1
+                    else:
+                        error_msg = result.get("error", "Unknown error") if result else "No result returned"
+                        print(f"[FORM1OCR2] [ERROR] {file_name}: {error_msg}")
+                        failed_files += 1
+
+                    processed_files.append({
+                        "file": file_name,
+                        "order_number": order_number,
+                        "page_number": page_number,
+                        "status": result.get("status", "error") if result else "error",
+                        "output_file": result.get("output_file") if result else None,
+                        "error": result.get("error") if result else "No result returned"
+                    })
+
+                except Exception as e:
+                    error_msg = f"Failed to process {file_name}: {str(e)}"
+                    print(f"[FORM1OCR2] [ERROR] {error_msg}")
+                    processed_files.append({
+                        "file": file_name,
+                        "status": "error",
+                        "error": error_msg
+                    })
+                    failed_files += 1
+                    self.results["errors"].append(error_msg)
+
+            # Store results
+            self.results["form1ocr2"] = {
+                "status": "completed" if failed_files == 0 else "completed_with_errors",
+                "total_files": len(table_bodyonly_files),
+                "successful_files": successful_files,
+                "failed_files": failed_files,
+                "processed_files": processed_files
+            }
+
+            print()
+            print(f"[FORM1OCR2] Processing summary:")
+            print(f"[FORM1OCR2]   Total files: {len(table_bodyonly_files)}")
+            print(f"[FORM1OCR2]   Successful: {successful_files}")
+            print(f"[FORM1OCR2]   Failed: {failed_files}")
+
+            return failed_files == 0
+
+        except Exception as e:
+            error_msg = f"Failed during Form1OCR2 processing: {str(e)}"
+            print(f"[FORM1OCR2] [ERROR] {error_msg}")
+            self.results["errors"].append(error_msg)
+            return False
+
+    def process_with_form1dat1(self):
+        """Process with Form1Dat1 agent for comprehensive data analysis"""
+        self.print_section("STEP 8: COMPREHENSIVE DATA ANALYSIS (FORM1DAT1)")
+
+        try:
+            # Initialize Form1Dat1 agent
+            form1dat1_agent = Form1Dat1Agent()
+            print(f"[FORM1DAT1] Agent initialized: {form1dat1_agent.name}")
+
+            # Look for order output files from previous processing
+            json_output_files = glob.glob(f"{self.output_dir}/json_output/*_out.json")
+
+            if not json_output_files:
+                print(f"[FORM1DAT1] No JSON output files found at {self.output_dir}/json_output/")
+                self.results["form1dat1"] = {"status": "no_files"}
+                return True
+
+            print(f"[FORM1DAT1] Found {len(json_output_files)} JSON output files to process")
+
+            # Process each JSON file (representing an order)
+            processed_orders = []
+            successful_orders = 0
+            failed_orders = 0
+
+            for json_file in json_output_files:
+                file_name = os.path.basename(json_file)
+                print(f"[FORM1DAT1] Processing: {file_name}")
+
+                try:
+                    # Extract order number from filename
+                    order_number = file_name.replace("_out.json", "")
+
+                    # Process with Form1Dat1 agent
+                    result = form1dat1_agent.process_order(order_number)
+
+                    if result and result.get("status") == "success":
+                        print(f"[FORM1DAT1] [SUCCESS] {file_name}")
+                        print(f"[FORM1DAT1]   Analysis output: {result.get('output_file', 'N/A')}")
+                        successful_orders += 1
+                    else:
+                        error_msg = result.get("error", "Unknown error") if result else "No result returned"
+                        print(f"[FORM1DAT1] [ERROR] {file_name}: {error_msg}")
+                        failed_orders += 1
+
+                    processed_orders.append({
+                        "file": file_name,
+                        "order_number": order_number,
+                        "status": result.get("status", "error") if result else "error",
+                        "output_file": result.get("output_file") if result else None,
+                        "error": result.get("error") if result else "No result returned"
+                    })
+
+                except Exception as e:
+                    error_msg = f"Failed to process {file_name}: {str(e)}"
+                    print(f"[FORM1DAT1] [ERROR] {error_msg}")
+                    processed_orders.append({
+                        "file": file_name,
+                        "status": "error",
+                        "error": error_msg
+                    })
+                    failed_orders += 1
+                    self.results["errors"].append(error_msg)
+
+            # Store results
+            self.results["form1dat1"] = {
+                "status": "completed" if failed_orders == 0 else "completed_with_errors",
+                "total_orders": len(json_output_files),
+                "successful_orders": successful_orders,
+                "failed_orders": failed_orders,
+                "processed_orders": processed_orders
+            }
+
+            print()
+            print(f"[FORM1DAT1] Processing summary:")
+            print(f"[FORM1DAT1]   Total orders: {len(json_output_files)}")
+            print(f"[FORM1DAT1]   Successful: {successful_orders}")
+            print(f"[FORM1DAT1]   Failed: {failed_orders}")
+
+            return failed_orders == 0
+
+        except Exception as e:
+            error_msg = f"Failed during Form1Dat1 processing: {str(e)}"
+            print(f"[FORM1DAT1] [ERROR] {error_msg}")
+            self.results["errors"].append(error_msg)
+            return False
+
     def run(self, skip_cleaning=False):
         """Run the complete table detection pipeline"""
         self.start_time = datetime.now()
@@ -1205,10 +1390,25 @@ class TableDetectionPipeline:
             print()
             print("[WARNING] Form1OCR1 order header OCR failed, but continuing...")
 
-        # Future steps can be added here:
-        # Step 5: Shape analysis
-        # Step 6: Text recognition
-        # etc.
+        # Step 5: Run Form1OCR2 for table OCR processing on all table_bodyonly files
+        ocr2_success = self.process_with_form1ocr2()
+
+        if ocr2_success:
+            print()
+            print("[SUCCESS] Form1OCR2 table OCR processing completed successfully")
+        else:
+            print()
+            print("[WARNING] Form1OCR2 table OCR processing failed, but continuing...")
+
+        # Step 6: Run Form1Dat1 for comprehensive data analysis
+        dat1_success = self.process_with_form1dat1()
+
+        if dat1_success:
+            print()
+            print("[SUCCESS] Form1Dat1 comprehensive data analysis completed successfully")
+        else:
+            print()
+            print("[WARNING] Form1Dat1 comprehensive data analysis failed, but continuing...")
 
         # Print summary
         self.print_summary()
