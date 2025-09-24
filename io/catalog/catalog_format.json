@@ -1,0 +1,51 @@
+{
+  "catalog_info": {
+    "created_by": "catalog_analyzer_agent",
+    "version": "1.0",
+    "created_date": "2025-09-24T01:29:29.656787",
+    "last_updated": "2025-09-24T01:29:29.657044",
+    "description": "Bent iron shape catalog database"
+  },
+  "shapes": {
+    "000": {
+      "shape_name": "000",
+      "shape_label": "non",
+      "shape_description": "straight line",
+      "number_of_ribs": 1,
+      "clock_direction": "NA",
+      "ribs": [
+        {
+          "rib_number": 1,
+          "rib_type": "regular",
+          "rib_letter": "A",
+          "angle_to_next": null
+        }
+      ],
+      "created_date": "2025-09-24T01:23:35.875240",
+      "status": "analyzed"
+    },
+    "104": {
+      "shape_name": "104",
+      "shape_label": "L",
+      "shape_description": "L type",
+      "number_of_ribs": 2,
+      "clock_direction": "counterclockwise",
+      "ribs": [
+        {
+          "rib_number": 1,
+          "rib_type": "regular",
+          "rib_letter": "A",
+          "angle_to_next": 90
+        },
+        {
+          "rib_number": 2,
+          "rib_type": "regular",
+          "rib_letter": "C",
+          "angle_to_next": null
+        }
+      ],
+      "created_date": "2025-09-24T01:29:29.657040",
+      "status": "analyzed"
+    }
+  }
+}

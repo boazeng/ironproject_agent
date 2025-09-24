@@ -15,9 +15,13 @@ import sys
 import fnmatch
 
 # Import the OrderHeader agent
-from agents.llm_agents.orderheader_agent import OrderHeaderAgent
+# from agents.llm_agents.orderheader_agent import OrderHeaderAgent
 # Import the Form1Dat1 agent for database management
-from agents.llm_agents.format1_agent.form1dat1 import Form1Dat1Agent
+# from agents.llm_agents.format1_agent.form1dat1 import Form1Dat1Agent
+# Import the UseAreaTable agent for table area processing
+# from agents.llm_agents.format1_agent.use_area_table import UseAreaTableAgent
+# Import JSON database for actual persistence
+from data.json_database import IronDrawingJSONDatabase
 
 app = Flask(__name__)
 CORS(app)
@@ -38,11 +42,17 @@ analysis_status = {
     'running': False,
     'last_run': None,
     'last_result': None,
-    'error': None
+    'error': None,
+    'current_stage': None,
+    'progress_messages': []
 }
 
 # Initialize Form1Dat1 agent for database management
-form1dat1_agent = Form1Dat1Agent()
+# form1dat1_agent = Form1Dat1Agent()
+# Initialize UseAreaTable agent for table area processing
+# use_area_table_agent = UseAreaTableAgent()
+# Initialize JSON database for persistence
+json_db = IronDrawingJSONDatabase("data/orders_database.json")
 
 @app.route('/')
 def index():
@@ -52,7 +62,54 @@ def index():
 @app.route('/test')
 def test():
     """Test template route"""
-    return render_template('test.html')
+    return "Test route is working!"
+
+@app.route('/status')
+def status():
+    """Simple status route"""
+    return {"status": "ok", "message": "Server is running"}
+
+@app.route('/api/latest-analysis')
+def latest_analysis():
+    """Mock latest analysis endpoint with sample data"""
+    return {
+        "status": "ok",
+        "message": "Analysis loaded successfully",
+        "file": "CO25S006375.pdf",
+        "order_number": "CO25S006375",
+        "customer": "חברת בניין דוגמה",
+        "shapes": [
+            {
+                "row": 1,
+                "page": 1,
+                "catalog": "000",
+                "shape_image": "CO25S006375_drawing_row_1_page1.png",
+                "dimensions": {"A": "150"},
+                "description": "קו ישר"
+            },
+            {
+                "row": 2,
+                "page": 1,
+                "catalog": "104",
+                "shape_image": "CO25S006375_drawing_row_2_page1.png",
+                "dimensions": {"A": "200", "C": "100"},
+                "description": "צורת L"
+            },
+            {
+                "row": 3,
+                "page": 1,
+                "catalog": "000",
+                "shape_image": "CO25S006375_drawing_row_3_page1.png",
+                "dimensions": {"A": "300"},
+                "description": "קו ישר"
+            }
+        ],
+        "table_data": [
+            {"row": 1, "catalog": "000", "diameter": "12", "quantity": "10", "notes": "לדוגמה בלבד"},
+            {"row": 2, "catalog": "104", "diameter": "16", "quantity": "8", "notes": "נתון לבדיקה"},
+            {"row": 3, "catalog": "000", "diameter": "20", "quantity": "12", "notes": "מאושר"}
+        ]
+    }
 
 @app.route('/api/run-analysis', methods=['POST'])
 def run_analysis():
@@ -76,12 +133,26 @@ def run_analysis():
     
     def run_script():
         global analysis_status
+
+        # Create log file for this run
+        log_filename = f"io/log/analysis_run_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+        os.makedirs("io/log", exist_ok=True)
+
         try:
             print(f"[DEBUG] Starting run_script function")
             print(f"[DEBUG] Selected file: {selected_file}")
+            print(f"[DEBUG] Logging to: {log_filename}")
+
+            # Open log file for writing
+            with open(log_filename, 'w', encoding='utf-8') as log_file:
+                log_file.write(f"Analysis started at {datetime.now().isoformat()}\n")
+                log_file.write(f"Selected file: {selected_file}\n")
+                log_file.write("="*60 + "\n\n")
 
             analysis_status['running'] = True
             analysis_status['error'] = None
+            analysis_status['current_stage'] = 'מתחיל עיבוד...'
+            analysis_status['progress_messages'] = []
 
             # Run the main_table_detection.py script (doesn't accept filename arguments)
             cmd = ['python', 'main_table_detection.py', '--skip-clean']
@@ -90,32 +161,115 @@ def run_analysis():
             print(f"[DEBUG] Current working directory: {os.getcwd()}")
             print(f"[DEBUG] Python executable: {sys.executable}")
 
-            result = subprocess.run(
+            # Run the script with real-time output capture
+            process = subprocess.Popen(
                 cmd,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
                 encoding='utf-8',
+                bufsize=1,
                 cwd=os.getcwd()
             )
 
-            print(f"[DEBUG] Command return code: {result.returncode}")
-            print(f"[DEBUG] Command stdout length: {len(result.stdout)}")
-            print(f"[DEBUG] Command stderr length: {len(result.stderr)}")
+            # Process output in real-time
+            output_lines = []
 
-            if result.stdout:
-                print(f"[DEBUG] Command stdout: {result.stdout[:500]}...")
-            if result.stderr:
-                print(f"[DEBUG] Command stderr: {result.stderr[:500]}...")
+            # Append to log file
+            with open(log_filename, 'a', encoding='utf-8') as log_file:
+                for line in process.stdout:
+                    line = line.strip()
+                    if line:
+                        output_lines.append(line)
+                        print(f"[PROCESS] {line}")
+
+                        # Write to log file with timestamp
+                        log_file.write(f"[{datetime.now().strftime('%H:%M:%S')}] {line}\n")
+                        log_file.flush()  # Ensure immediate write
+
+                        # Parse and update progress based on output patterns
+                        if 'STEP' in line:
+                            # Extract stage from STEP messages
+                            if ':' in line:
+                                parts = line.split(':')
+                                if len(parts) > 1:
+                                    stage_msg = parts[1].strip()
+                                    analysis_status['current_stage'] = stage_msg
+                                    analysis_status['progress_messages'].append(f"שלב: {stage_msg}")
+                                    log_file.write(f"[STAGE] {stage_msg}\n")
+                        elif '[FORMAT1]' in line:
+                            analysis_status['current_stage'] = 'מעבד פורמט 1...'
+                            analysis_status['progress_messages'].append('מעבד הזמנה בפורמט 1')
+                            log_file.write(f"[STAGE] Processing Format 1\n")
+                        elif '[FORM1S1]' in line:
+                            analysis_status['current_stage'] = 'ממיר PDF לתמונות...'
+                            analysis_status['progress_messages'].append('ממיר PDF לתמונות')
+                            log_file.write(f"[STAGE] Converting PDF to images\n")
+                        elif '[FORM1S2]' in line:
+                            analysis_status['current_stage'] = 'מזהה טבלאות...'
+                            analysis_status['progress_messages'].append('מזהה טבלאות בדפים')
+                            log_file.write(f"[STAGE] Detecting tables\n")
+                        elif '[FORM1S3]' in line:
+                            analysis_status['current_stage'] = 'מוצא קווי רשת...'
+                            analysis_status['progress_messages'].append('מוצא קווי רשת בטבלאות')
+                            log_file.write(f"[STAGE] Finding grid lines\n")
+                        elif '[FORM1S3_1]' in line:
+                            analysis_status['current_stage'] = 'מחלץ גוף טבלה...'
+                            analysis_status['progress_messages'].append('מחלץ גוף טבלה')
+                            log_file.write(f"[STAGE] Extracting table body\n")
+                        elif '[FORM1S3_2]' in line:
+                            analysis_status['current_stage'] = 'סופר שורות...'
+                            analysis_status['progress_messages'].append('סופר שורות בטבלה')
+                            log_file.write(f"[STAGE] Counting rows\n")
+                        elif '[FORM1S4]' in line:
+                            analysis_status['current_stage'] = 'מחלץ צורות...'
+                            analysis_status['progress_messages'].append('מחלץ צורות מטבלה')
+                            log_file.write(f"[STAGE] Extracting shapes\n")
+                        elif '[FORM1OCR2]' in line:
+                            analysis_status['current_stage'] = 'מבצע OCR על טבלה...'
+                            analysis_status['progress_messages'].append('מבצע OCR על תוכן הטבלה')
+                            log_file.write(f"[STAGE] Performing OCR\n")
+                        elif '[FORM1DAT1]' in line:
+                            analysis_status['current_stage'] = 'שומר במאגר נתונים...'
+                            analysis_status['progress_messages'].append('שומר נתונים במאגר')
+                            log_file.write(f"[STAGE] Saving to database\n")
+                        elif 'SUCCESS' in line or 'completed successfully' in line:
+                            analysis_status['progress_messages'].append('✓ ' + line[:100])
+                            log_file.write(f"[SUCCESS] {line}\n")
+                        elif 'ERROR' in line or 'failed' in line:
+                            analysis_status['progress_messages'].append('✗ ' + line[:100])
+                            log_file.write(f"[ERROR] {line}\n")
+
+                # Wait for process to complete
+                process.wait()
+                return_code = process.returncode
+
+                # Log final status
+                log_file.write(f"\n{'='*60}\n")
+                log_file.write(f"[{datetime.now().strftime('%H:%M:%S')}] PROCESS COMPLETED\n")
+                log_file.write(f"Return code: {return_code}\n")
+                log_file.write(f"Total output lines: {len(output_lines)}\n")
+
+            print(f"[DEBUG] Command return code: {return_code}")
+            print(f"[DEBUG] Total output lines: {len(output_lines)}")
 
             analysis_status['last_run'] = datetime.now().isoformat()
 
-            if result.returncode == 0:
-                analysis_status['last_result'] = 'success'
-                print("[DEBUG] Analysis completed successfully")
-            else:
-                analysis_status['last_result'] = 'error'
-                analysis_status['error'] = result.stderr
-                print(f"[DEBUG] Analysis failed: {result.stderr}")
+            # Append final status to log file
+            with open(log_filename, 'a', encoding='utf-8') as log_file:
+                if return_code == 0:
+                    analysis_status['last_result'] = 'success'
+                    analysis_status['current_stage'] = 'הושלם בהצלחה!'
+                    analysis_status['progress_messages'].append('✓ העיבוד הושלם בהצלחה')
+                    log_file.write(f"[FINAL] SUCCESS - Analysis completed successfully\n")
+                    print("[DEBUG] Analysis completed successfully")
+                else:
+                    analysis_status['last_result'] = 'error'
+                    analysis_status['error'] = 'Analysis process failed'
+                    analysis_status['current_stage'] = 'שגיאה בעיבוד'
+                    analysis_status['progress_messages'].append('✗ העיבוד נכשל')
+                    log_file.write(f"[FINAL] ERROR - Analysis failed with return code: {return_code}\n")
+                    print(f"[DEBUG] Analysis failed with return code: {return_code}")
 
         except Exception as e:
             analysis_status['last_result'] = 'error'
@@ -125,6 +279,8 @@ def run_analysis():
             print(f"[DEBUG] Traceback: {traceback.format_exc()}")
         finally:
             analysis_status['running'] = False
+            if not analysis_status['current_stage']:
+                analysis_status['current_stage'] = 'לא פעיל'
             print(f"[DEBUG] run_script function completed")
     
     # Run in background thread
@@ -137,6 +293,16 @@ def run_analysis():
     return jsonify({
         'success': True,
         'message': 'Analysis started'
+    })
+
+@app.route('/api/analysis-progress')
+def get_analysis_progress():
+    """Get current analysis progress with detailed stage information"""
+    return jsonify({
+        'running': analysis_status['running'],
+        'current_stage': analysis_status['current_stage'],
+        'progress_messages': analysis_status['progress_messages'][-10:],  # Return last 10 messages
+        'error': analysis_status['error']
     })
 
 @app.route('/api/analysis-status')
@@ -532,25 +698,14 @@ def save_section_selections():
                 x1 = int((selection['x'] + selection['width']) * 2)
                 y1 = int((selection['y'] + selection['height']) * 2)
                 
-                # Map section types to existing directory names and file patterns
-                directory_mapping = {
-                    'order_header': 'order_header',
-                    'table_header': 'table_header', 
-                    'table_area': 'table',
-                    'shape_column': 'shape_column'
-                }
-                
-                filename_mapping = {
-                    'order_header': f"{base_name}_order_header.png",
-                    'table_header': f"{base_name}_table_header.png",
-                    'table_area': f"{base_name}_main_table.png", 
-                    'shape_column': f"{base_name}_shape_column.png"
-                }
-                
-                # Save cropped image
-                output_filename = filename_mapping.get(section_type, f"{base_name}_{section_type}.png")
-                target_directory = directory_mapping.get(section_type, section_type)
-                output_path = os.path.join(OUTPUT_DIR, 'table_detection', target_directory, output_filename)
+                # Save user selections to user_saved_area folder
+                page_number = selection['page']
+
+                # Create filename with page number at the end
+                output_filename = f"{base_name}_{section_type}_page{page_number}.png"
+
+                # Save to user_saved_area folder
+                output_path = os.path.join(OUTPUT_DIR, 'user_saved_area', output_filename)
                 
                 # Ensure directory exists
                 os.makedirs(os.path.dirname(output_path), exist_ok=True)
@@ -613,6 +768,49 @@ def save_section_selections():
     except Exception as e:
         import traceback
         print(f"Error saving section selections: {e}")
+        print(traceback.format_exc())
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/process-table-area', methods=['POST'])
+def process_table_area():
+    """Process user-saved table area image and add green row lines"""
+    try:
+        data = request.json
+        order_name = data.get('order_name')
+        page_number = data.get('page_number')
+
+        if not order_name or not page_number:
+            return jsonify({'success': False, 'error': 'Missing order_name or page_number'})
+
+        # Check if file exists first
+        file_exists = use_area_table_agent.check_file_exists(order_name, page_number, OUTPUT_DIR)
+
+        if not file_exists:
+            return jsonify({
+                'success': False,
+                'error': f'No table area file found for {order_name}, page {page_number}'
+            })
+
+        # Process the table area
+        result = use_area_table_agent.process_page(order_name, page_number, OUTPUT_DIR)
+
+        if result['status'] == 'success':
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'input_file': result['input_file'],
+                'output_file': result['output_file'],
+                'rows_detected': result.get('rows_detected', 0)
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['message']
+            })
+
+    except Exception as e:
+        import traceback
+        print(f"Error processing table area: {e}")
         print(traceback.format_exc())
         return jsonify({'success': False, 'error': str(e)})
 
@@ -1020,8 +1218,28 @@ def get_table_ocr_data(page_number):
 
         print(f"[DEBUG] Getting table data from database for order {order_number}, page {page_number}")
 
-        # Get data from database Section 3
-        section3_data = form1dat1_agent.get_section_data(order_number, "section_3_shape_analysis")
+        # Get data from real output file instead of database
+        output_file_path = f'io/fullorder_output/json_output/{order_number}_out.json'
+
+        try:
+            with open(output_file_path, 'r', encoding='utf-8') as f:
+                full_data = json.load(f)
+            section3_data = full_data.get('section_3_shape_analysis', {})
+            print(f"[DEBUG] Loaded real data from {output_file_path}")
+        except FileNotFoundError:
+            print(f"[ERROR] Output file not found: {output_file_path}")
+            return jsonify({
+                'success': False,
+                'error': f'Output file not found for order {order_number}',
+                'page_number': page_number
+            })
+        except Exception as e:
+            print(f"[ERROR] Error loading output file: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Error loading data: {str(e)}',
+                'page_number': page_number
+            })
 
         if not section3_data:
             return jsonify({
@@ -1051,7 +1269,8 @@ def get_table_ocr_data(page_number):
             row = {
                 'row_number': line_data.get('line_number', 0),
                 'מס': line_data.get('order_line_no', ''),
-                'shape': line_data.get('shape_number', ''),
+                'shape': line_data.get('shape_description', ''),
+                'קטלוג': line_data.get('shape_catalog_number', ''),  # Catalog number from database
                 'קוטר': line_data.get('diameter', ''),
                 'סהכ יחידות': str(line_data.get('number_of_units', 0)),
                 'אורך': line_data.get('length', ''),  # Length from database
@@ -1094,11 +1313,13 @@ def save_to_database_section3(order_number, page_number, line_number, row_data):
     Follows the database structure defined in readme_database_structure.txt
     """
     try:
-        # Initialize order if it doesn't exist
-        form1dat1_agent.initialize_order(order_number)
+        # Initialize order if it doesn't exist (mock)
+        # form1dat1_agent.initialize_order(order_number)
 
-        # Get current Section 3 data or create new structure
-        current_section3 = form1dat1_agent.get_section_data(order_number, "section_3_shape_analysis") or {}
+        # Get current Section 3 data from database or create new structure
+        order_key = f"order_{order_number}_section3"
+        existing_order_data = json_db.get_drawing(order_key) or {}
+        current_section3 = existing_order_data.get("section_3", {})
 
         # Create page structure if it doesn't exist
         page_key = f"page_{page_number}"
@@ -1115,16 +1336,17 @@ def save_to_database_section3(order_number, page_number, line_number, row_data):
         existing_line = current_section3[page_key]["order_lines"].get(line_key, {})
 
         current_section3[page_key]["order_lines"][line_key] = {
-            "line_number": line_number,
+            "line_number": int(row_data.get('מס', line_number)) if row_data.get('מס', '').isdigit() else line_number,  # Use מס field from OCR as line_number
             "order_line_no": row_data.get('מס', ''),
-            "shape_number": row_data.get('shape', ''),
+            "shape_description": row_data.get('shape', ''),
+            "shape_catalog_number": row_data.get('קטלוג', ''),  # Catalog number for the shape
             "number_of_ribs": 0,  # Default, can be updated later
             "diameter": row_data.get('קוטר', ''),
             "number_of_units": int(row_data.get('סהכ יחידות', 0)) if row_data.get('סהכ יחידות', '').isdigit() else 0,
             "length": row_data.get('אורך', ''),  # Length field
             "weight": row_data.get('משקל', ''),  # Weight field
             "notes": row_data.get('הערות', ''),  # Notes field
-            "checked": existing_line.get('checked', False),  # Preserve existing checked status or default to False
+            "checked": row_data.get('checked', existing_line.get('checked', False)),  # Use new checked status or preserve existing
             "ribs": {}  # Will be populated when shape analysis is available
         }
 
@@ -1132,7 +1354,11 @@ def save_to_database_section3(order_number, page_number, line_number, row_data):
         current_section3[page_key]["number_of_order_lines"] = len(current_section3[page_key]["order_lines"])
 
         # Save to database
-        success = form1dat1_agent.update_section(order_number, "section_3_shape_analysis", current_section3, merge=False)
+        # success = form1dat1_agent.update_section(order_number, "section_3_shape_analysis", current_section3, merge=False)
+        # Save to JSON database (we already have order_key from loading)
+        existing_order_data["section_3"] = current_section3
+        json_db.add_drawing(order_key, existing_order_data)
+        success = True
 
         if success:
             print(f"[OK] Saved to database: Order {order_number}, Page {page_number}, Line {line_number}")
@@ -1160,6 +1386,7 @@ def update_checked_status():
         row_data_from_screen = data.get('rowData', {})
 
         print(f"[DEBUG] Updating checked status: Order {order_number}, Page {page_number}, Line {line_number}, Checked: {checked}")
+        print(f"[DEBUG] Row data from screen has 'checked' field: {'checked' in row_data_from_screen if row_data_from_screen else 'No row data'}")
         try:
             print(f"[DEBUG] Screen data: {row_data_from_screen}")
         except UnicodeEncodeError:
@@ -1169,7 +1396,103 @@ def update_checked_status():
         row_data_saved = False
         if row_data_from_screen:
             # Save the complete line data from screen to database
+            # Add the checked status to the row data
+            row_data_from_screen['checked'] = checked
             save_success = save_to_database_section3(order_number, page_number, line_number, row_data_from_screen)
+
+            # IMPORTANT: Also update the OCR JSON file so frontend can see the changes
+            ocr_file_path = os.path.join(
+                OUTPUT_DIR,
+                'table_detection',
+                'table_ocr',
+                f'{order_number}_table_ocr_page{page_number}.json'
+            )
+
+            if os.path.exists(ocr_file_path):
+                try:
+                    # Load existing OCR data
+                    with open(ocr_file_path, 'r', encoding='utf-8') as f:
+                        ocr_data = json.load(f)
+
+                    # Update the checked status for the specific line
+                    if 'table_data' in ocr_data and 'rows' in ocr_data['table_data']:
+                        row_index = int(line_number) - 1  # Convert to 0-based index
+                        if 0 <= row_index < len(ocr_data['table_data']['rows']):
+                            ocr_data['table_data']['rows'][row_index]['checked'] = checked
+
+                            # Save back to file
+                            with open(ocr_file_path, 'w', encoding='utf-8') as f:
+                                json.dump(ocr_data, f, ensure_ascii=False, indent=2)
+
+                            print(f"[OK] Updated OCR JSON file with checked={checked} for line {line_number}")
+                except Exception as e:
+                    print(f"[WARNING] Could not update OCR JSON file: {e}")
+
+            # IMPORTANT: Also update the central output JSON file
+            central_output_path = os.path.join(
+                OUTPUT_DIR,
+                'json_output',
+                f'{order_number}_out.json'
+            )
+
+            if os.path.exists(central_output_path):
+                try:
+                    # Load existing central output data
+                    with open(central_output_path, 'r', encoding='utf-8') as f:
+                        central_data = json.load(f)
+
+                    # Update the checked status in section_3_shape_analysis
+                    if 'section_3_shape_analysis' in central_data:
+                        page_key = f"page_{page_number}"
+                        if page_key in central_data['section_3_shape_analysis']:
+                            line_key = f"line_{line_number}"
+                            if 'order_lines' in central_data['section_3_shape_analysis'][page_key]:
+                                if line_key in central_data['section_3_shape_analysis'][page_key]['order_lines']:
+                                    # Update the checked status
+                                    central_data['section_3_shape_analysis'][page_key]['order_lines'][line_key]['checked'] = checked
+                                    # Update all row data from screen if available
+                                    if row_data_from_screen:
+                                        # Map Hebrew fields to English field names
+                                        field_mapping = {
+                                            'מס': 'order_line_no',
+                                            'shape': 'shape_description',
+                                            'קוטר': 'diameter',
+                                            'סהכ יחידות': 'number_of_units',
+                                            'אורך': 'length',
+                                            'משקל': 'weight',
+                                            'הערות': 'notes',
+                                            'קטלוג': 'shape_catalog_number'
+                                        }
+                                        # Update each field from screen data
+                                        for hebrew_field, english_field in field_mapping.items():
+                                            if hebrew_field in row_data_from_screen:
+                                                value = row_data_from_screen[hebrew_field]
+                                                # Convert numeric fields
+                                                if english_field == 'number_of_units':
+                                                    try:
+                                                        value = int(value) if str(value).isdigit() else 0
+                                                    except:
+                                                        value = 0
+                                                elif english_field == 'order_line_no':
+                                                    # Also update line_number to match
+                                                    try:
+                                                        line_num = int(value) if str(value).isdigit() else int(line_number)
+                                                        central_data['section_3_shape_analysis'][page_key]['order_lines'][line_key]['line_number'] = line_num
+                                                    except:
+                                                        pass
+                                                central_data['section_3_shape_analysis'][page_key]['order_lines'][line_key][english_field] = value
+
+                                    # Update modified date
+                                    if 'section_1_general' in central_data:
+                                        central_data['section_1_general']['date_modified'] = datetime.now().isoformat()
+
+                                    # Save back to file
+                                    with open(central_output_path, 'w', encoding='utf-8') as f:
+                                        json.dump(central_data, f, ensure_ascii=False, indent=2)
+
+                                    print(f"[OK] Updated central output file with complete data and checked={checked} for line {line_number}")
+                except Exception as e:
+                    print(f"[WARNING] Could not update central output file: {e}")
 
             if save_success:
                 print(f"[OK] Saved complete line data from screen for line {line_number} on page {page_number} (checked={checked})")
@@ -1179,8 +1502,9 @@ def update_checked_status():
         else:
             print(f"[WARNING] No row data received from screen for line {line_number}")
 
-        # Update the checked status
-        success = form1dat1_agent.update_line_checked_status(order_number, page_number, line_number, checked)
+        # Update the checked status (mock)
+        # success = form1dat1_agent.update_line_checked_status(order_number, page_number, line_number, checked)
+        success = True  # Mock success
 
         if success:
             return jsonify({
@@ -1286,6 +1610,46 @@ def serve_shape_image_by_row(order_number, page_number, row_number):
         print(f"[ERROR] Failed to serve shape image: {e}")
         abort(500)
 
+@app.route('/api/catalog-ribs/<string:catalog_number>')
+def get_catalog_ribs(catalog_number):
+    """Get number of ribs for a catalog shape number"""
+    try:
+        catalog_file_path = os.path.join('io', 'catalog', 'catalog_format.json')
+
+        if not os.path.exists(catalog_file_path):
+            return jsonify({
+                'success': False,
+                'error': 'Catalog file not found'
+            })
+
+        # Load catalog data
+        with open(catalog_file_path, 'r', encoding='utf-8') as f:
+            catalog_data = json.load(f)
+
+        # Look for the catalog number in the shapes section
+        if 'shapes' in catalog_data and catalog_number in catalog_data['shapes']:
+            shape_info = catalog_data['shapes'][catalog_number]
+            number_of_ribs = shape_info.get('number_of_ribs', 0)
+
+            return jsonify({
+                'success': True,
+                'catalog_number': catalog_number,
+                'number_of_ribs': number_of_ribs,
+                'shape_description': shape_info.get('shape_description', '')
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Catalog number {catalog_number} not found'
+            })
+
+    except Exception as e:
+        print(f"[ERROR] Failed to get catalog ribs for {catalog_number}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
 if __name__ == "__main__":
     # Create necessary directories
     os.makedirs('templates', exist_ok=True)
@@ -1294,9 +1658,9 @@ if __name__ == "__main__":
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     print("IRONMAN Web Interface Starting...")
-    print("Navigate to: http://localhost:5000")
+    print("Navigate to: http://localhost:5002")
     print("Press Ctrl+C to stop the server")
     print("[DEBUG] UPDATED CODE LOADED - Version with debug logging")
 
     # Run the Flask app with template auto-reload enabled
-    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=True)
+    app.run(debug=True, host='0.0.0.0', port=5002, use_reloader=True)

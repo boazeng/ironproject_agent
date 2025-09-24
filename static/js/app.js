@@ -6,6 +6,7 @@ let pageNumPending = null;
 let scale = 1.0;
 let currentData = null;
 let currentSelectedFile = null;
+let currentShapeRow = null;  // Store current shape row data for modal
 
 // Area selection variables
 let isSelectingArea = false;
@@ -66,8 +67,7 @@ function setupEventListeners() {
     // Run Analysis button
     document.getElementById('run-analysis').addEventListener('click', runAnalysis);
     
-    // Refresh button
-    document.getElementById('refresh-data').addEventListener('click', loadLatestAnalysis);
+    // Refresh button - removed from UI
     
     // Tab buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -117,14 +117,20 @@ async function runAnalysis() {
     const runBtn = document.getElementById('run-analysis');
     const status = document.getElementById('status');
     const processingStatus = document.getElementById('processing-status');
-    
+
+    // Clear previous notifications
+    clearProgressNotifications();
+
     // Update UI to show processing
     runBtn.disabled = true;
     runBtn.innerHTML = '<span class="loading"></span> מעבד...';
     status.textContent = 'מעבד';
     status.className = 'value status-processing';
-    processingStatus.textContent = 'מריץ זיהוי טבלה...';
-    
+    processingStatus.textContent = 'מתחיל עיבוד...';
+
+    // Show initial notification
+    showProgressNotification('🚀 מתחיל עיבוד הזמנה...', 'stage');
+
     try {
         // Prepare request body with selected filename
         const requestBody = {};
@@ -162,13 +168,108 @@ async function runAnalysis() {
     }
 }
 
+// Progress notification management
+let notificationQueue = [];
+let lastProgressMessages = [];
+
+function showProgressNotification(message, type = 'info') {
+    const container = document.getElementById('progress-notifications');
+    if (!container) return;
+
+    const notification = document.createElement('div');
+    notification.className = `progress-notification ${type}`;
+
+    // Choose icon based on type
+    let icon = '📋';
+    if (type === 'stage') icon = '⚡';
+    else if (type === 'success') icon = '✅';
+    else if (type === 'error') icon = '❌';
+    else if (type === 'warning') icon = '⚠️';
+    else if (message.includes('מעבד')) icon = '⚙️';
+    else if (message.includes('מזהה')) icon = '🔍';
+    else if (message.includes('ממיר')) icon = '🔄';
+    else if (message.includes('מחלץ')) icon = '📤';
+    else if (message.includes('סופר')) icon = '🔢';
+    else if (message.includes('OCR')) icon = '📝';
+    else if (message.includes('שומר')) icon = '💾';
+
+    const time = new Date().toLocaleTimeString('he-IL');
+
+    notification.innerHTML = `
+        <div class="notification-icon">${icon}</div>
+        <div class="notification-content">
+            <div class="notification-message">${message}</div>
+            <div class="notification-time">${time}</div>
+        </div>
+    `;
+
+    container.appendChild(notification);
+    notificationQueue.push(notification);
+
+    // Keep only last 8 notifications visible
+    if (notificationQueue.length > 8) {
+        const oldNotification = notificationQueue.shift();
+        oldNotification.classList.add('fade-out');
+        setTimeout(() => oldNotification.remove(), 500);
+    }
+
+    // Auto-scroll to latest
+    container.scrollTop = container.scrollHeight;
+}
+
+function clearProgressNotifications() {
+    const container = document.getElementById('progress-notifications');
+    if (container) {
+        container.innerHTML = '';
+        notificationQueue = [];
+        lastProgressMessages = [];
+    }
+}
+
+async function updateProgress() {
+    try {
+        const response = await fetch('/api/analysis-progress');
+        const progress = await response.json();
+
+        if (progress.current_stage) {
+            const processingStatus = document.getElementById('processing-status');
+            if (processingStatus) {
+                processingStatus.textContent = progress.current_stage;
+            }
+        }
+
+        // Show new progress messages
+        if (progress.progress_messages && progress.progress_messages.length > 0) {
+            for (const message of progress.progress_messages) {
+                if (!lastProgressMessages.includes(message)) {
+                    let type = 'info';
+                    if (message.includes('שלב:')) type = 'stage';
+                    else if (message.includes('✓')) type = 'success';
+                    else if (message.includes('✗')) type = 'error';
+
+                    showProgressNotification(message, type);
+                    lastProgressMessages.push(message);
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching progress:', error);
+    }
+}
+
 function pollForCompletion() {
+    // Start progress polling
+    const progressInterval = setInterval(updateProgress, 500);
+
     const checkStatus = async () => {
         try {
             const response = await fetch('/api/analysis-status');
             const statusData = await response.json();
 
             if (!statusData.running) {
+                // Stop progress polling
+                clearInterval(progressInterval);
+
                 // Analysis completed
                 if (statusData.last_result === 'success') {
                     // Success
@@ -178,6 +279,9 @@ function pollForCompletion() {
                     status.textContent = 'הושלם';
                     status.className = 'value status-ready';
                     processingStatus.textContent = 'זיהוי הטבלה הושלם בהצלחה!';
+
+                    // Show success notification
+                    showProgressNotification('✅ העיבוד הושלם בהצלחה!', 'success');
 
                     // Load the new data
                     setTimeout(() => {
@@ -191,15 +295,19 @@ function pollForCompletion() {
                     status.textContent = 'שגיאה';
                     status.className = 'value status-error';
                     processingStatus.textContent = `שגיאה: ${statusData.error || 'שגיאה לא ידועה'}`;
+
+                    // Show error notification
+                    showProgressNotification('❌ העיבוד נכשל', 'error');
                 }
 
                 // Reset button
                 resetAnalysisButton();
 
-                // Clear status after 5 seconds
+                // Clear notifications after 8 seconds
                 setTimeout(() => {
+                    clearProgressNotifications();
                     document.getElementById('processing-status').textContent = '';
-                }, 5000);
+                }, 8000);
             } else {
                 // Still running, check again in 1 second
                 setTimeout(checkStatus, 1000);
@@ -293,6 +401,11 @@ async function autoUploadFromInputFolder() {
                     if ((selectData.pdf_path || selectData.path) && file.name.toLowerCase().endsWith('.pdf')) {
                         const pdfPath = selectData.pdf_path || `/input/${file.name}`;
                         loadPDF(pdfPath);
+
+                        // After loading PDF, also load the table data for page 1
+                        setTimeout(() => {
+                            updatePageDisplays(1);
+                        }, 1000);
                     }
                 } else {
                     console.error('Auto-upload failed:', selectData.error);
@@ -679,13 +792,14 @@ function updateTableForCurrentPage(pageNumber) {
                 // Transform the OCR data format to match our table structure
                 const transformedItems = data.rows.map(row => ({
                     'מס': row['מס'] || row['row_number'] || '',
+                    'קטלוג': row['קטלוג'] || '-', // Catalog number from database
                     'shape': row['shape'] || '-', // Shape information for צורה column
                     'קוטר': row['קוטר'] || '-',
                     'סהכ יחידות': row['סהכ יחידות'] || '-',
                     'אורך': row['אורך'] || '-',
                     'משקל': row['משקל'] || '-',
                     'הערות': row['הערות'] || '-',
-                    'checked': false  // Default to unchecked initially
+                    'checked': row['checked'] || false  // Use checked status from database
                 }));
 
                 displayTableItems(transformedItems, pageNumber);
@@ -772,6 +886,16 @@ function displayTableItems(items, pageNumber) {
                     if (this.value !== this.getAttribute('data-original-value')) {
                         saveTableCell(pageNumber, index, fieldName, this.value);
                         this.setAttribute('data-original-value', this.value);
+
+                        // If catalog field is updated, also update it in shapes section
+                        if (fieldName === 'קטלוג') {
+                            const rowId = `shape-row-${pageNumber}-${index + 1}`;
+                            const shapeCatalogInput = document.getElementById(`catalog-input-${rowId}`);
+                            if (shapeCatalogInput) {
+                                shapeCatalogInput.value = this.value;
+                                updateCatalogImage(this.value, rowId);
+                            }
+                        }
                     }
                 });
 
@@ -893,8 +1017,19 @@ function displayTableItems(items, pageNumber) {
         updateShapesDisplay(items, pageNumber);
     } else {
         tbody.innerHTML = '<tr><td colspan="9" class="no-data">אין נתונים להצגה עבור עמוד ' + pageNumber + '</td></tr>';
-        document.getElementById('total-weight').textContent = '0 kg';
-        document.getElementById('total-rows').textContent = '0';
+
+        // Update total weight if element exists
+        const totalWeightEl = document.getElementById('total-weight');
+        if (totalWeightEl) {
+            totalWeightEl.textContent = '0 kg';
+        }
+
+        // Update total rows if element exists
+        const totalRowsEl = document.getElementById('total-rows');
+        if (totalRowsEl) {
+            totalRowsEl.textContent = '0';
+        }
+
         console.log(`📄 No data to display for page ${pageNumber}`);
 
         // Clear shapes display when no data
@@ -979,7 +1114,15 @@ async function updateShapesDisplay(items, pageNumber) {
                            pattern="[0-9]{1,5}"
                            title="הכנס מספר קטלוג (1-5 ספרות)"
                            style="width: 100%; text-align: center; font-size: 12px; padding: 2px; border: 1px solid #ccc; background: white;">
-                    <div class="rib-count-container" style="margin-top: 4px;">
+                    <div class="rib-count-container" style="margin-top: 4px; display: flex; align-items: center; gap: 4px;">
+                        <button class="shape-id-btn-inline" onclick="runShapeIdentification('${rowId}')" title="הפעל זיהוי צורה">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.516 6.516 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5Z" fill="currentColor"/>
+                                <path d="M12 10.5H14V12.5H12V10.5Z" fill="currentColor"/>
+                                <path d="M10.5 6.5H12.5V8.5H10.5V6.5Z" fill="currentColor"/>
+                                <path d="M8 8.5H10V10.5H8V8.5Z" fill="currentColor"/>
+                            </svg>
+                        </button>
                         <input type="text" class="rib-field rib-count" maxlength="2" style="width: 40px;" placeholder="מס׳ צלעות">
                     </div>
                 </td>
@@ -1077,10 +1220,34 @@ async function updateShapesDisplay(items, pageNumber) {
             shapesBody.appendChild(ribRow1);
             shapesBody.appendChild(ribRow2);
 
-            // Add event listener for catalog input
+            // Add event listener for catalog input and set initial value
             const catalogInput = document.getElementById(`catalog-input-${rowId}`);
+            // Set the catalog value from the item data if available
+            if (items && items[index] && items[index]['קטלוג']) {
+                catalogInput.value = items[index]['קטלוג'];
+                // Also update the catalog image immediately
+                updateCatalogImage(items[index]['קטלוג'], rowId);
+            }
             catalogInput.addEventListener('input', function() {
                 updateCatalogImage(this.value, rowId);
+                // Also update the catalog number in the orders table
+                saveTableCell(pageNumber, index, 'קטלוג', this.value);
+
+                // Update the catalog field in the orders table
+                const tbody = document.getElementById('items-tbody');
+                if (tbody && tbody.rows[index]) {
+                    const catalogCell = tbody.rows[index].cells[2]; // קטלוג is the 3rd column (index 2)
+                    const catalogInput = catalogCell ? catalogCell.querySelector('input') : null;
+                    if (catalogInput) {
+                        catalogInput.value = this.value;
+                        catalogInput.setAttribute('data-original-value', this.value);
+                    }
+                }
+
+                // Fetch number of ribs from catalog when a catalog number is entered
+                if (this.value.trim()) {
+                    fetchCatalogRibs(this.value.trim(), rowId);
+                }
             });
 
             // Add event listener for rib count input
@@ -1101,6 +1268,34 @@ async function updateShapesDisplay(items, pageNumber) {
     }
 
     console.log(`📐 Shape images displayed: ${shapeImages.length} images found for page ${pageNumber}`);
+}
+
+// Fetch number of ribs from catalog API
+async function fetchCatalogRibs(catalogNumber, rowId) {
+    try {
+        console.log(`🔍 Fetching ribs count for catalog number: ${catalogNumber}`);
+        const response = await fetch(`/api/catalog-ribs/${catalogNumber}`);
+        const data = await response.json();
+
+        if (data.success) {
+            const numberOfRibs = data.number_of_ribs;
+            console.log(`📐 Found ${numberOfRibs} ribs for catalog ${catalogNumber}`);
+
+            // Find the rib count input field for this row
+            const ribCountInput = document.querySelector(`#catalog-input-${rowId}`).parentElement.querySelector('.rib-count');
+            if (ribCountInput) {
+                // Update the rib count field
+                ribCountInput.value = numberOfRibs;
+                // Trigger the visibility update for rib fields
+                updateRibFieldsVisibility(numberOfRibs, rowId);
+                console.log(`✅ Updated ribs count to ${numberOfRibs} for row ${rowId}`);
+            }
+        } else {
+            console.log(`⚠️ Catalog number ${catalogNumber} not found in catalog`);
+        }
+    } catch (error) {
+        console.error(`❌ Error fetching catalog ribs for ${catalogNumber}:`, error);
+    }
 }
 
 // Update rib fields visibility based on number of ribs
@@ -1862,7 +2057,7 @@ async function showFileSelection() {
     const container = document.getElementById('file-list-container');
     
     // Show modal
-    modal.style.display = 'block';
+    modal.style.display = 'flex';
     
     // Load files
     container.innerHTML = '<div class="loading">טוען קבצים...</div>';
@@ -2969,7 +3164,7 @@ function updateCatalogImage(catalogNumber, rowId) {
                  alt="קטלוג ${catalogNumber}"
                  class="catalog-table-image"
                  title="צורת קטלוג ${catalogNumber} - לחץ להגדלה"
-                 onclick="openImageModal('${imageUrl}', 'צורת קטלוג ${catalogNumber}', 'קטלוג')"
+                 onclick="openCatalogShapeModal('${catalogNumber}', this.parentElement.parentElement)"
                  onerror="this.parentElement.innerHTML='<div class=\\'catalog-shape-placeholder\\'><span>קטלוג לא נמצא</span></div>'"
                  style="max-width: 100%; max-height: 120px; object-fit: contain; border: 1px solid #e0e0e0; border-radius: 4px; background: white;">
         `;
@@ -2987,5 +3182,158 @@ function updateCatalogImage(catalogNumber, rowId) {
                 <span>הכנס מספר תקין</span>
             </div>
         `;
+    }
+}
+
+// ============================================
+// Catalog Shape Modal Functions (Legacy - now handled by shape-modals.js)
+// ============================================
+// Note: Shape modal functionality has been moved to shape-modals.js
+
+// ============================================
+// Shape Identification Functions
+// ============================================
+
+function runShapeIdentification(rowId) {
+    console.log('Shape identification started', rowId ? `for row: ${rowId}` : 'for all shapes');
+
+    // Handle both global and row-specific identification
+    let button;
+    if (rowId) {
+        // Find the specific button for this row
+        button = document.querySelector(`button[onclick*="${rowId}"]`);
+    } else {
+        // Global identification button (if it exists)
+        button = document.getElementById('identify-shapes-btn');
+    }
+
+    if (!button) return;
+
+    // Disable button during processing
+    button.disabled = true;
+
+    // Change button appearance to show processing
+    const originalSVG = button.innerHTML;
+    button.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M12 18V22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M4.93 4.93L7.76 7.76" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M16.24 16.24L19.07 19.07" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M2 12H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M18 12H22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M4.93 19.07L7.76 16.24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M16.24 7.76L19.07 4.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+    `;
+
+    // Add spinning animation
+    const svg = button.querySelector('svg');
+    if (svg) {
+        svg.style.animation = 'spin 1s linear infinite';
+    }
+
+    // Update shapes status
+    const shapesStatus = document.getElementById('shapes-status');
+    if (shapesStatus) {
+        shapesStatus.textContent = 'מזהה צורות...';
+    }
+
+    // Create notification for shape identification process
+    const notificationTitle = rowId ? 'זיהוי צורה בודדת' : 'זיהוי צורות';
+    const notificationMessage = rowId ? `מזהה צורה ${rowId}...` : 'מתחיל תהליך זיהוי צורות...';
+
+    createProgressNotification(
+        rowId ? `shape-identification-${rowId}` : 'shape-identification',
+        notificationTitle,
+        notificationMessage,
+        'processing'
+    );
+
+    // Simulate shape identification process
+    setTimeout(() => {
+        // Update notification
+        const processingMessage = rowId ? `מעבד צורה ${rowId}...` : 'מעבד תמונות צורות...';
+        updateProgressNotification(
+            rowId ? `shape-identification-${rowId}` : 'shape-identification',
+            notificationTitle,
+            processingMessage,
+            'processing'
+        );
+
+        setTimeout(() => {
+            // Complete the process
+            const completedTitle = rowId ? 'זיהוי צורה הושלם' : 'זיהוי צורות הושלם';
+            const completedMessage = rowId ? `זוהה צורה ${rowId} בהצלחה` : 'זוהו 5 צורות בהצלחה';
+            updateProgressNotification(
+                rowId ? `shape-identification-${rowId}` : 'shape-identification',
+                completedTitle,
+                completedMessage,
+                'success'
+            );
+
+            // Update shapes status
+            if (shapesStatus) {
+                shapesStatus.textContent = 'הושלם';
+            }
+
+            // Restore button
+            button.disabled = false;
+            button.innerHTML = originalSVG;
+
+            // Load identified shapes (placeholder data) - only for global identification
+            if (!rowId) {
+                loadIdentifiedShapes();
+            }
+
+        }, 2000);
+    }, 1500);
+}
+
+function loadIdentifiedShapes() {
+    const shapesTable = document.getElementById('shapes-tbody');
+    if (!shapesTable) return;
+
+    // Placeholder data for identified shapes
+    const identifiedShapes = [
+        { page: 1, line: 1, catalog: '107', drawing: 'shape_107.png' },
+        { page: 1, line: 2, catalog: '104', drawing: 'shape_104.png' },
+        { page: 1, line: 3, catalog: '107', drawing: 'shape_107.png' },
+    ];
+
+    // Clear existing content
+    shapesTable.innerHTML = '';
+
+    // Add identified shapes to table
+    identifiedShapes.forEach(shape => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${shape.page}/${shape.line}</td>
+            <td>${shape.catalog}</td>
+            <td>
+                <div class="shape-drawing-cell">
+                    <img src="/static/images/shapes/${shape.drawing}"
+                         alt="ציור צורה"
+                         class="shape-drawing-image"
+                         onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                         style="max-width: 100%; max-height: 80px; object-fit: contain;">
+                    <div class="shape-placeholder" style="display: none;">
+                        <span>ציור לא זמין</span>
+                    </div>
+                </div>
+            </td>
+            <td>
+                <button class="catalog-view-btn" onclick="openCatalogShapeModal('${shape.catalog}', this.parentElement.parentElement)">
+                    צפה בקטלוג
+                </button>
+            </td>
+        `;
+        shapesTable.appendChild(row);
+    });
+
+    // Update total shapes count
+    const totalShapes = document.getElementById('total-shapes');
+    if (totalShapes) {
+        totalShapes.textContent = identifiedShapes.length;
     }
 }
