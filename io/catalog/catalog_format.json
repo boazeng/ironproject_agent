@@ -17,12 +17,9 @@
         {
           "rib_number": 1,
           "rib_type": "regular",
-          "rib_letter": "A",
-          "angle_to_next": null
+          "rib_letter": "A"
         }
-      ],
-      "created_date": "2025-09-24T01:23:35.875240",
-      "status": "analyzed"
+      ]
     },
     "104": {
       "shape_name": "104",
@@ -34,18 +31,121 @@
         {
           "rib_number": 1,
           "rib_type": "regular",
-          "rib_letter": "A",
-          "angle_to_next": 90
+          "rib_letter": "A"
+        },
+        {
+          "angle": "1-2",
+          "angle type": "90",
+          "angle_letter": "B"
+        },        
+        {
+          "rib_number": 3,
+          "rib_type": "regular",
+          "rib_letter": "C"
+        }
+      ]
+    },
+    "107": {
+      "shape_name": "107",
+      "shape_label": "rectangle",
+      "shape_description": "rectangular shape",
+      "number_of_ribs": 3,
+      "clock_direction": "NA",
+      "ribs": [
+        {
+          "rib_number": 1,
+          "rib_type": "regular",
+          "rib_letter": "A"
+        },
+        {
+          "angle": "1-2",
+          "angle_type": "90",
+          "angle_letter": "B"
         },
         {
           "rib_number": 2,
           "rib_type": "regular",
-          "rib_letter": "C",
-          "angle_to_next": null
+          "rib_letter": "C"
+        },
+        {
+          "angle": "2-3",
+          "angle_type": "90",
+          "angle_letter": "D"
+        },
+        {
+          "rib_number": 3,
+          "rib_type": "regular",
+          "rib_letter": "E"
         }
-      ],
-      "created_date": "2025-09-24T01:29:29.657040",
-      "status": "analyzed"
+      ]
+    },
+    "210": {
+      "shape_name": "210",
+      "shape_label": "U",
+      "shape_description": "U type, open to top",
+      "number_of_ribs": 3,
+      "clock_direction": "clockwise",
+      "ribs": [
+        {
+          "rib_number": 1,
+          "rib_type": "regular",
+          "rib_letter": "A"
+        },
+        {
+          "angle": "1-2",
+          "angle_type": "90",
+          "angle_letter": "D"
+        },
+        {
+          "rib_number": 2,
+          "rib_type": "regular",
+          "rib_letter": "B"
+        },
+        {
+          "angle": "2-3",
+          "angle_type": "90",
+          "angle_letter": "E"
+        },
+        {
+          "rib_number": 3,
+          "rib_type": "regular",
+          "rib_letter": "C"
+        }
+      ]
+    },
+    "218": {
+      "shape_name": "218",
+      "shape_label": "U",
+      "shape_description": "U type shape, rotate 90 counterclockwise",
+      "number_of_ribs": 3,
+      "clock_direction": "counterclockwise",
+      "ribs": [
+        {
+          "rib_number": 1,
+          "rib_type": "regular",
+          "rib_letter": "A"
+        },
+        {
+          "angle": "1-2",
+          "angle_type": "90",
+          "angle_letter": "B"
+        },
+        {
+          "rib_number": 2,
+          "rib_type": "regular",
+          "rib_letter": "C"
+        },
+        {
+          "angle": "2-3",
+          "angle_type": "90",
+          "angle_letter": "D"
+        },
+        {
+          "rib_number": 3,
+          "rib_type": "regular",
+          "rib_letter": "E"
+        }
+      ]
     }
   }
 }
