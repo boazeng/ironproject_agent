@@ -763,12 +763,23 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabName);
     });
-    
+
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.toggle('active', content.id === `${tabName}-tab`);
     });
+
+    // Handle shapes tab activation - populate with stored data
+    if (tabName === 'shapes' && globalShapesData && globalCurrentPage) {
+        console.log('📐 Shapes tab activated - calling updateShapesDisplay with stored data');
+        // Small delay to ensure DOM is ready
+        setTimeout(() => {
+            updateShapesDisplay(globalShapesData, globalCurrentPage);
+        }, 50);
+    }
 }
+
+// Shapes table is now populated by updateShapesDisplay() function (Version 15 format)
 
 // Update page displays
 function updatePageDisplays(pageNumber) {
@@ -895,6 +906,9 @@ function displayTableItems(items, pageNumber) {
                                 shapeCatalogInput.value = this.value;
                                 updateCatalogImage(this.value, rowId);
                             }
+
+                            // Immediately update expanded table if this row is expanded
+                            updateExpandedTablesForRow(pageNumber, index, this.value);
                         }
                     }
                 });
@@ -1037,13 +1051,21 @@ function displayTableItems(items, pageNumber) {
     }
 }
 
+// Global storage for shapes data
+let globalShapesData = null;
+let globalCurrentPage = null;
+
 // Update shapes display for current page
 async function updateShapesDisplay(items, pageNumber) {
+    // Store data globally for later use when shapes tab is activated
+    globalShapesData = items;
+    globalCurrentPage = pageNumber;
+
     const shapesTable = document.getElementById('shapes-table');
     const shapesBody = document.getElementById('shapes-tbody');
 
     if (!shapesTable || !shapesBody) {
-        console.log('❌ Shapes table elements not found');
+        console.log('📐 Shapes data stored (shapes tab not visible)');
         return;
     }
 
@@ -1508,65 +1530,276 @@ function updateLastUpdateTime() {
 
 // Toggle row expansion for rib details
 function toggleRow(rowId) {
+    console.log(`%c🔄 TOGGLE: Row expansion called for rowId: ${rowId}`, 'color: purple; font-weight: bold; font-size: 14px;');
+
     const tbody = document.getElementById('items-tbody');
     const row = tbody.querySelector(`tr[data-row-id="${rowId}"]`);
     const expandBtn = row.querySelector('.expand-btn');
     const existingExpanded = tbody.querySelector(`tr[data-expanded-for="${rowId}"]`);
-    
+
+    console.log(`🔄 TOGGLE: tbody:`, tbody);
+    console.log(`🔄 TOGGLE: row:`, row);
+    console.log(`🔄 TOGGLE: expandBtn:`, expandBtn);
+    console.log(`🔄 TOGGLE: existingExpanded:`, existingExpanded);
+
     if (existingExpanded) {
         // Collapse - remove expanded row
         existingExpanded.remove();
         expandBtn.textContent = '+';
         expandBtn.classList.remove('expanded');
     } else {
+        // Get the catalog number from the row (assuming it's in the 3rd cell - קטלוג column)
+        console.log(`🔄 TOGGLE: Getting catalog number from row, cells:`, row.cells);
+
+        let catalogNumber = null;
+        const catalogCell = row.cells[2]; // קטלוג column (index 2)
+        console.log(`🔄 TOGGLE: Catalog cell (index 2):`, catalogCell);
+
+        if (catalogCell) {
+            const catalogInput = catalogCell.querySelector('input');
+            console.log(`🔄 TOGGLE: Catalog input in cell:`, catalogInput);
+
+            if (catalogInput) {
+                catalogNumber = catalogInput.value;
+                console.log(`🔄 TOGGLE: Catalog from input value: "${catalogNumber}"`);
+            } else {
+                catalogNumber = catalogCell.textContent.trim();
+                console.log(`🔄 TOGGLE: Catalog from cell text: "${catalogNumber}"`);
+            }
+        }
+
+        console.log(`🔄 TOGGLE: Initial catalog number: "${catalogNumber}"`);
+
+        // If no catalog number, try to use a default or skip
+        if (!catalogNumber || catalogNumber === '-' || catalogNumber === '') {
+            catalogNumber = '210'; // Default fallback
+            console.log(`🔄 TOGGLE: Using fallback catalog: "${catalogNumber}"`);
+        } else {
+            console.log(`🔄 TOGGLE: Using found catalog: "${catalogNumber}"`);
+        }
+
         // Expand - create new row with rib details
         const expandedRow = tbody.insertRow(row.rowIndex);
         expandedRow.classList.add('expanded-row');
         expandedRow.setAttribute('data-expanded-for', rowId);
-        
+
         const expandedCell = expandedRow.insertCell(0);
         expandedCell.colSpan = 10;
-        
-        // Create rib details table
+
+        // Create rib details table with 1/3 width layout
         expandedCell.innerHTML = `
-            <div class="rib-header">פירוט צלעות - פריט #${rowId + 1}</div>
-            <table class="rib-details">
-                <thead>
-                    <tr>
-                        <th>צלע #</th>
-                        <th>אורך צלע (cm)</th>
-                        <th>זוית לצלע הבאה (°)</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${generateRibDetails(rowId)}
-                </tbody>
-            </table>
+            <div class="expanded-row-container">
+                <div class="rib-details-section">
+                    <table class="rib-details">
+                        <tbody>
+                            ${generateRibDetails(rowId, catalogNumber)}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="shape-template-section">
+                    <div class="template-content" id="shape-template-${catalogNumber}">
+                        ${generateShapeTemplate(catalogNumber)}
+                    </div>
+                </div>
+            </div>
         `;
-        
+
         expandBtn.textContent = '−';
         expandBtn.classList.add('expanded');
+
+        // Load the shape template content via AJAX
+        console.log(`🔄 TOGGLE: About to load template for catalog: "${catalogNumber}"`);
+        if (catalogNumber && catalogNumber !== '-' && catalogNumber !== '') {
+            console.log(`🔄 TOGGLE: ✅ Catalog number is valid, calling loadShapeTemplate`);
+            // Use setTimeout to ensure DOM is ready
+            setTimeout(() => {
+                const templateContainerId = `shape-template-${catalogNumber}`;
+                console.log(`🔄 TOGGLE: Looking for container: ${templateContainerId}`);
+                const testContainer = document.getElementById(templateContainerId);
+                console.log(`🔄 TOGGLE: Container found:`, testContainer);
+                if (testContainer) {
+                    loadExpandedShapeTemplate(catalogNumber, templateContainerId)
+                        .then(() => console.log(`🔄 TOGGLE: Template loaded`))
+                        .catch(err => console.error(`🔄 TOGGLE: Template load error:`, err));
+                } else {
+                    console.error(`🔄 TOGGLE: Container ${templateContainerId} not found in DOM`);
+                }
+            }, 100);
+        } else {
+            console.log(`🔄 TOGGLE: ❌ Catalog number is invalid: "${catalogNumber}"`);
+        }
     }
 }
 
-// Generate rib details (mock data for now - will be replaced with real data)
-function generateRibDetails(rowId) {
-    // For demonstration, create 8 ribs with sample data
-    let ribHtml = '';
-    for (let i = 1; i <= 8; i++) {
-        const length = Math.floor(Math.random() * 100) + 10; // Random length 10-110 cm
-        const angle = i < 8 ? (Math.floor(Math.random() * 3) + 1) * 90 : null; // 90°, 180°, or 270° (null for last rib)
-        
-        ribHtml += `
-            <tr>
-                <td>${i}</td>
-                <td>${length}</td>
-                <td>${angle || '-'}</td>
-            </tr>
-        `;
+// Store catalog data globally
+let catalogData = null;
+
+// Load catalog data on page load
+async function loadCatalogData() {
+    try {
+        const response = await fetch('/api/catalog-data');
+        const data = await response.json();
+        if (data.success) {
+            catalogData = data.data;
+        }
+    } catch (error) {
+        console.error('Failed to load catalog data:', error);
     }
+}
+
+// Generate rib details from catalog data
+function generateRibDetails(rowId, catalogNumber) {
+    // Use the passed catalogNumber parameter
+    const shapeNumber = catalogNumber;
+
+    let ribHtml = '';
+
+    if (catalogData && catalogData.shapes && catalogData.shapes[shapeNumber]) {
+        const shape = catalogData.shapes[shapeNumber];
+        const ribs = shape.ribs || [];
+
+        ribs.forEach(item => {
+            // Check if it's visible
+            if (item.visible !== false) {
+                let letter = '';
+                let value = Math.floor(Math.random() * 100) + 10; // Still using random for now
+
+                // Determine if it's a rib or angle
+                if (item.rib_letter) {
+                    letter = item.rib_letter;
+                } else if (item.angle_letter) {
+                    letter = item.angle_letter;
+                }
+
+                ribHtml += `
+                    <tr>
+                        <td>${letter}</td>
+                        <td>${value}</td>
+                    </tr>
+                `;
+            }
+        });
+    } else {
+        // Fallback to default if catalog data not available
+        for (let i = 1; i <= 8; i++) {
+            const length = Math.floor(Math.random() * 100) + 10;
+            ribHtml += `
+                <tr>
+                    <td>${i}</td>
+                    <td>${length}</td>
+                </tr>
+            `;
+        }
+    }
+
     return ribHtml;
 }
+
+// Generate shape template display
+function generateShapeTemplate(catalogNumber) {
+    if (!catalogNumber || catalogNumber === '-' || catalogNumber === '') {
+        return `
+            <div class="template-placeholder">
+                <span>בחר מספר קטלוג לתצוגת התבנית</span>
+            </div>
+        `;
+    }
+
+    // Return a placeholder that will be populated by loadShapeTemplate
+    return `
+        <div class="template-loading">טוען תבנית...</div>
+    `;
+}
+
+// Load shape template content via AJAX for expanded rows
+async function loadExpandedShapeTemplate(catalogNumber, containerId) {
+    console.log(`[TEMPLATE] START - Loading template for catalog: ${catalogNumber}`);
+    console.log(`[TEMPLATE] Container ID: ${containerId}`);
+
+    if (!catalogNumber || catalogNumber === '-' || catalogNumber === '') {
+        console.log('[TEMPLATE] Invalid catalog number, skipping template load');
+        return Promise.reject('Invalid catalog number');
+    }
+
+    // Try multiple ways to find the container
+    const container1 = document.getElementById(containerId);
+    const container2 = document.querySelector(`#${containerId}`);
+    const container3 = document.querySelector(`[id="${containerId}"]`);
+
+    console.log(`[TEMPLATE] getElementById result:`, container1);
+    console.log(`[TEMPLATE] querySelector #${containerId} result:`, container2);
+    console.log(`[TEMPLATE] querySelector [id="${containerId}"] result:`, container3);
+
+    const container = container1 || container2 || container3;
+
+    if (!container) {
+        console.error(`%c[TEMPLATE] CONTAINER NOT FOUND!`, 'color: red; font-weight: bold;');
+        console.error(`[TEMPLATE] Looking for: "${containerId}"`);
+        console.error(`[TEMPLATE] All template containers in DOM:`, document.querySelectorAll('.shape-template-container'));
+
+        // Try to find ANY shape template container and use it
+        const anyTemplateContainer = document.querySelector('.shape-template-container');
+        if (anyTemplateContainer) {
+            console.log(`[TEMPLATE] Found alternative container:`, anyTemplateContainer);
+            anyTemplateContainer.innerHTML = `<div style="background: red; color: white; padding: 10px;">
+                CONTAINER MISMATCH DETECTED!<br>
+                Looking for: ${containerId}<br>
+                Found: ${anyTemplateContainer.id || 'no-id'}
+            </div>`;
+        }
+        return;
+    }
+
+    console.log(`%c[TEMPLATE] CONTAINER FOUND!`, 'color: green; font-weight: bold;');
+    console.log(`[TEMPLATE] Container element:`, container);
+    console.log(`[TEMPLATE] Container ID:`, container.id);
+    console.log(`[TEMPLATE] Container classes:`, container.className);
+
+    container.innerHTML = `<div style="text-align: center; padding: 10px;">
+        <span>טוען תבנית...</span>
+    </div>`;
+
+    try {
+        console.log(`[TEMPLATE] Starting fetch from /api/shape-template/${catalogNumber}`);
+
+        const response = await fetch(`/api/shape-template/${catalogNumber}`);
+        console.log(`[TEMPLATE] Response status: ${response.status}, ok: ${response.ok}`);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+        }
+
+        const templateData = await response.json();
+        console.log(`[TEMPLATE] JSON received, success: ${templateData.success}`);
+
+        if (templateData.success && templateData.template) {
+            const templateContent = templateData.template;
+            console.log(`[TEMPLATE] Template content length: ${templateContent.length} chars`);
+
+            container.innerHTML = templateContent;
+            console.log('[TEMPLATE] Template loaded successfully');
+            return Promise.resolve('Template loaded');
+
+        } else {
+            throw new Error(templateData.error || 'Template data invalid');
+        }
+
+    } catch (error) {
+        console.error('[TEMPLATE] Error:', error);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 10px; color: #cc0000;">
+                <span>שגיאה בטעינת התבנית</span>
+            </div>
+        `;
+        return Promise.reject(error);
+    }
+}
+
+
+// Load catalog data when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    loadCatalogData();
+});
 
 // Setup inline editing functionality
 function setupInlineEditing() {
@@ -1923,15 +2156,21 @@ async function redetectShapes() {
     }
 }
 
+// Global storage for the complete data object
+let globalAnalysisData = null;
+
 // Display shapes detected by GLOBAL agent
 function displayShapes(data) {
+    // Store the complete data globally for shapes tab activation
+    globalAnalysisData = data;
+
     const shapesTable = document.getElementById('shapes-table');
     const shapesBody = document.getElementById('shapes-tbody');
+    const shapesContainer = document.getElementById('shapes-container');
 
     // Check if we're using the old container or new table format
     if (!shapesTable || !shapesBody) {
         // Fall back to old container if table not found
-        const shapesContainer = document.getElementById('shapes-container');
         if (!shapesContainer) return;
 
         // Don't clear shapes if we already have shape images displayed
@@ -1955,12 +2194,13 @@ function displayShapes(data) {
         
         // No longer updating count since element was removed
         console.log(`📐 Found ${shapes.length} shapes`);
-        
+
         // Clear container
-        shapesContainer.innerHTML = '';
-        
-        // Create shape items with column information
-        shapes.forEach((shapeInfo, index) => {
+        if (shapesContainer) {
+            shapesContainer.innerHTML = '';
+
+            // Create shape items with column information
+            shapes.forEach((shapeInfo, index) => {
             // Extract filename from path
             const filename = shapeInfo.path.split('\\').pop() || shapeInfo.path.split('/').pop();
             const shapeNumber = shapeInfo.row_number;
@@ -1993,22 +2233,23 @@ function displayShapes(data) {
                     </div>
                 </div>
             `;
-            
-            shapesContainer.appendChild(shapeItem);
-        });
-        
+
+                shapesContainer.appendChild(shapeItem);
+            });
+        }
     } else if (data.shape_cell_paths && data.shape_cell_paths.length > 0) {
         // Fallback to old format (backward compatibility)
         const shapes = data.shape_cell_paths;
-        
+
         // No longer updating count since element was removed
         console.log(`📐 Found ${shapes.length} shapes`);
-        
-        // Clear container
-        shapesContainer.innerHTML = '';
-        
-        // Create shape items (without column information)
-        shapes.forEach((shapePath, index) => {
+
+        if (shapesContainer) {
+            // Clear container
+            shapesContainer.innerHTML = '';
+
+            // Create shape items (without column information)
+            shapes.forEach((shapePath, index) => {
             // Extract filename from path
             const filename = shapePath.split('\\').pop() || shapePath.split('/').pop();
             const shapeNumber = index + 1;
@@ -2033,20 +2274,23 @@ function displayShapes(data) {
                     <small>שורה ${shapeNumber} בטבלה</small>
                 </div>
             `;
-            
-            shapesContainer.appendChild(shapeItem);
-        });
-        
-    } else {
+
+                shapesContainer.appendChild(shapeItem);
+            });
+        }
+ else {
         // No shapes found
         console.log('📐 No shapes found');
-        shapesContainer.innerHTML = `
-            <div class="no-shapes-placeholder">
-                <p>🔍 לא נמצאו צורות</p>
-                <p>הרץ ניתוח כדי לזהות צורות מהמסמך</p>
-            </div>
-        `;
+        if (shapesContainer) {
+            shapesContainer.innerHTML = `
+                <div class="no-shapes-placeholder">
+                    <p>🔍 לא נמצאו צורות</p>
+                    <p>הרץ ניתוח כדי לזהות צורות מהמסמך</p>
+                </div>
+            `;
+        }
     }
+}
 }
 
 // File Selection Functions
@@ -3027,6 +3271,11 @@ async function saveTableCell(pageNumber, rowIndex, fieldName, newValue) {
                 updateTotalWeight();
             }
 
+            // Update expanded table if catalog field was changed
+            if (fieldName === 'קטלוג') {
+                updateExpandedTablesForRow(pageNumber, rowIndex, newValue);
+            }
+
             console.log('✅ Table cell saved successfully');
         } else {
             throw new Error(result.error || 'Failed to save');
@@ -3041,6 +3290,44 @@ async function saveTableCell(pageNumber, rowIndex, fieldName, newValue) {
                 statusEl.textContent = '';
             }, 3000);
         }
+    }
+}
+
+// Update expanded table when catalog number changes
+function updateExpandedTablesForRow(pageNumber, rowIndex, newCatalogNumber) {
+    // Find the table row that corresponds to this rowIndex
+    const tbody = document.getElementById('items-tbody');
+    if (!tbody || !tbody.rows[rowIndex]) {
+        return;
+    }
+
+    const row = tbody.rows[rowIndex];
+    const rowId = `row-${row.rowIndex}`;
+
+    // Check if this row is currently expanded
+    const expandedRow = document.getElementById(`expanded-${rowId}`);
+    if (expandedRow && expandedRow.style.display !== 'none') {
+        // Row is expanded, find the rib details section and update it
+        const ribDetailsSection = expandedRow.querySelector('.rib-details-section tbody');
+        if (ribDetailsSection) {
+            // Generate new rib details with the updated catalog number
+            const newRibDetails = generateRibDetails(rowId, newCatalogNumber);
+            ribDetailsSection.innerHTML = newRibDetails;
+        }
+
+        // Also update the shape template
+        const templateSection = expandedRow.querySelector('.template-content');
+        if (templateSection) {
+            const newTemplate = generateShapeTemplate(newCatalogNumber);
+            templateSection.innerHTML = newTemplate;
+
+            // Load the actual template content via AJAX
+            if (newCatalogNumber && newCatalogNumber !== '-' && newCatalogNumber !== '') {
+                loadShapeTemplate(newCatalogNumber, `shape-template-${newCatalogNumber}`);
+            }
+        }
+
+        console.log(`Updated expanded table and shape template for row ${rowIndex + 1} with catalog number ${newCatalogNumber}`);
     }
 }
 
