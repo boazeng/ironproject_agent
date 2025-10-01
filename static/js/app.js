@@ -92,7 +92,13 @@ function setupEventListeners() {
     
     // Setup inline editing for header fields
     setupInlineEditing();
-    
+
+    // Table refresh button
+    const refreshTableBtn = document.getElementById('refresh-table-btn');
+    if (refreshTableBtn) {
+        refreshTableBtn.addEventListener('click', refreshCurrentTableData);
+    }
+
     // Header action buttons (removed)
 
     // Table save button removed
@@ -223,6 +229,85 @@ function clearProgressNotifications() {
         container.innerHTML = '';
         notificationQueue = [];
         lastProgressMessages = [];
+    }
+}
+
+// Advanced notification functions for shape identification
+function createProgressNotification(id, title, message, type = 'processing') {
+    const container = document.getElementById('progress-notifications');
+    if (!container) return;
+
+    // Remove existing notification with same ID
+    removeProgressNotification(id);
+
+    const notification = document.createElement('div');
+    notification.className = `progress-notification ${type}`;
+    notification.id = `notification-${id}`;
+
+    // Choose icon based on type
+    let icon = '🔍';
+    if (type === 'processing') icon = '⚙️';
+    else if (type === 'success') icon = '✅';
+    else if (type === 'error') icon = '❌';
+    else if (type === 'warning') icon = '⚠️';
+
+    const time = new Date().toLocaleTimeString('he-IL');
+
+    notification.innerHTML = `
+        <div class="notification-icon">${icon}</div>
+        <div class="notification-content">
+            <div class="notification-title">${title}</div>
+            <div class="notification-message">${message}</div>
+            <div class="notification-time">${time}</div>
+        </div>
+    `;
+
+    container.appendChild(notification);
+
+    // Auto-scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+function updateProgressNotification(id, title, message, type = 'processing') {
+    const notification = document.getElementById(`notification-${id}`);
+    if (!notification) {
+        // If notification doesn't exist, create it
+        createProgressNotification(id, title, message, type);
+        return;
+    }
+
+    // Update the notification
+    notification.className = `progress-notification ${type}`;
+
+    // Choose icon based on type
+    let icon = '🔍';
+    if (type === 'processing') icon = '⚙️';
+    else if (type === 'success') icon = '✅';
+    else if (type === 'error') icon = '❌';
+    else if (type === 'warning') icon = '⚠️';
+
+    const time = new Date().toLocaleTimeString('he-IL');
+
+    notification.innerHTML = `
+        <div class="notification-icon">${icon}</div>
+        <div class="notification-content">
+            <div class="notification-title">${title}</div>
+            <div class="notification-message">${message}</div>
+            <div class="notification-time">${time}</div>
+        </div>
+    `;
+
+    // Auto-scroll to bottom
+    const container = document.getElementById('progress-notifications');
+    if (container) {
+        container.scrollTop = container.scrollHeight;
+    }
+}
+
+function removeProgressNotification(id) {
+    const notification = document.getElementById(`notification-${id}`);
+    if (notification) {
+        notification.remove();
     }
 }
 
@@ -556,9 +641,16 @@ function displayAnalysisData(data) {
                     const row = tbody.insertRow();
                     row.setAttribute('data-row-id', index);
                     
-                    // Expand button
+                    // Expand button and identification button
                     const expandCell = row.insertCell(0);
-                    expandCell.innerHTML = '<button class="expand-btn" onclick="toggleRow(' + index + ')">+</button>';
+                    expandCell.innerHTML = `
+                        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                            <button class="expand-btn" onclick="toggleRow(${index})">+</button>
+                            <button class="identification-btn-small" onclick="runShapeIdentification('shape-row-1-${index + 1}')" title="הפעל זיהוי צורה">
+                                זיהוי
+                            </button>
+                        </div>
+                    `;
                     
                     // Handle both array format and object format
                     if (Array.isArray(item)) {
@@ -852,6 +944,41 @@ function updateTableForCurrentPage(pageNumber) {
         });
 }
 
+// Refresh current table data without changing the page
+function refreshCurrentTableData() {
+    console.log('🔄 Refreshing current table data...');
+
+    // Get current page number from the first row or page display
+    const firstRow = document.querySelector('tr[data-page]');
+    const currentPage = firstRow ? firstRow.getAttribute('data-page') :
+                       (document.getElementById('page-num') ? document.getElementById('page-num').textContent : '1');
+
+    console.log(`🔄 Refreshing data for page ${currentPage}`);
+
+    // Add loading indicator to refresh button
+    const refreshBtn = document.getElementById('refresh-table-btn');
+    if (refreshBtn) {
+        const originalText = refreshBtn.innerHTML;
+        refreshBtn.innerHTML = '<span class="btn-icon">⏳</span>מרענן...';
+        refreshBtn.disabled = true;
+
+        // Reset button after refresh
+        setTimeout(() => {
+            refreshBtn.innerHTML = originalText;
+            refreshBtn.disabled = false;
+        }, 2000);
+    }
+
+    // Reload table data for current page
+    updateTableForCurrentPage(parseInt(currentPage));
+
+    // Also refresh shapes data if on shapes tab
+    const shapesTab = document.querySelector('.tab-btn[data-tab="shapes"]');
+    if (shapesTab && shapesTab.classList.contains('active')) {
+        updateShapesDisplay(globalShapesData || [], parseInt(currentPage));
+    }
+}
+
 // Display table items in the UI
 function displayTableItems(items, pageNumber) {
     const tbody = document.getElementById('items-tbody');
@@ -870,9 +997,16 @@ function displayTableItems(items, pageNumber) {
             row.setAttribute('data-row-id', index);
             row.setAttribute('data-page', pageNumber);
 
-            // Expand button
+            // Expand button and identification button
             const expandCell = row.insertCell(0);
-            expandCell.innerHTML = '<button class="expand-btn" onclick="toggleRow(' + index + ')">+</button>';
+            expandCell.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                    <button class="expand-btn" onclick="toggleRow(${index})">+</button>
+                    <button class="identification-btn-small" onclick="runShapeIdentification('shape-row-${pageNumber}-${index + 1}')" title="הפעל זיהוי צורה">
+                        זיהוי
+                    </button>
+                </div>
+            `;
 
             // Create editable cells
             function createEditableCell(value, fieldName) {
@@ -1250,6 +1384,10 @@ async function updateShapesDisplay(items, pageNumber) {
                 // Also update the catalog image immediately
                 updateCatalogImage(items[index]['קטלוג'], rowId);
             }
+
+            // Store original value for change tracking
+            catalogInput.setAttribute('data-original-value', catalogInput.value || '');
+
             catalogInput.addEventListener('input', function() {
                 updateCatalogImage(this.value, rowId);
                 // Also update the catalog number in the orders table
@@ -1269,6 +1407,22 @@ async function updateShapesDisplay(items, pageNumber) {
                 // Fetch number of ribs from catalog when a catalog number is entered
                 if (this.value.trim()) {
                     fetchCatalogRibs(this.value.trim(), rowId);
+                }
+            });
+
+            // Add blur event to call Form1dat2 when field loses focus and value changed
+            catalogInput.addEventListener('blur', function() {
+                const originalValue = this.getAttribute('data-original-value') || '';
+                const currentValue = this.value.trim();
+
+                if (originalValue !== currentValue && currentValue !== '') {
+                    console.log(`[SHAPES TABLE] Catalog number changed from "${originalValue}" to "${currentValue}" for ${rowId}`);
+
+                    // Call Form1dat2 API to update central output file
+                    updateCatalogNumber(pageNumber, index + 1, currentValue);
+
+                    // Update stored original value
+                    this.setAttribute('data-original-value', currentValue);
                 }
             });
 
@@ -1520,6 +1674,45 @@ function getCurrentOrderNumber() {
     return 'CO25S006375';
 }
 
+// Update catalog number using Form1dat2 API
+async function updateCatalogNumber(pageNumber, lineNumber, catalogNumber) {
+    try {
+        console.log(`[DEBUG] Calling Form1dat2 API: Page ${pageNumber}, Line ${lineNumber}, Catalog ${catalogNumber}`);
+
+        const orderNumber = getCurrentOrderNumber();
+        if (!orderNumber) {
+            console.warn('No order number available for catalog update');
+            return;
+        }
+
+        const response = await fetch('/api/update-catalog-number', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                orderNumber: orderNumber,
+                pageNumber: pageNumber,
+                lineNumber: lineNumber,
+                catalogNumber: catalogNumber
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            console.log('✅ Form1dat2 catalog update successful:', result.message);
+            if (result.updated_fields) {
+                console.log('Updated fields:', result.updated_fields);
+            }
+        } else {
+            console.error('❌ Form1dat2 catalog update failed:', result.error);
+        }
+    } catch (error) {
+        console.error('❌ Error calling Form1dat2 API:', error);
+    }
+}
+
 // Update last update time
 function updateLastUpdateTime() {
     const now = new Date();
@@ -1529,83 +1722,123 @@ function updateLastUpdateTime() {
 }
 
 // Toggle row expansion for rib details
-function toggleRow(rowId) {
+async function toggleRow(rowId) {
     console.log(`%c🔄 TOGGLE: Row expansion called for rowId: ${rowId}`, 'color: purple; font-weight: bold; font-size: 14px;');
 
+    // Get elements first (before refresh which might modify DOM)
     const tbody = document.getElementById('items-tbody');
     const row = tbody.querySelector(`tr[data-row-id="${rowId}"]`);
     const expandBtn = row.querySelector('.expand-btn');
     const existingExpanded = tbody.querySelector(`tr[data-expanded-for="${rowId}"]`);
 
-    console.log(`🔄 TOGGLE: tbody:`, tbody);
-    console.log(`🔄 TOGGLE: row:`, row);
-    console.log(`🔄 TOGGLE: expandBtn:`, expandBtn);
-    console.log(`🔄 TOGGLE: existingExpanded:`, existingExpanded);
-
+    // If collapsing, no need to refresh
     if (existingExpanded) {
-        // Collapse - remove expanded row
+        console.log(`🔄 TOGGLE: Collapsing row ${rowId} - no refresh needed`);
         existingExpanded.remove();
         expandBtn.textContent = '+';
         expandBtn.classList.remove('expanded');
-    } else {
-        // Get the catalog number from the row (assuming it's in the 3rd cell - קטלוג column)
-        console.log(`🔄 TOGGLE: Getting catalog number from row, cells:`, row.cells);
+        return;
+    }
 
-        let catalogNumber = null;
-        const catalogCell = row.cells[2]; // קטלוג column (index 2)
-        console.log(`🔄 TOGGLE: Catalog cell (index 2):`, catalogCell);
+    // Only refresh when expanding (not collapsing)
+    console.log(`🔄 TOGGLE: Auto-refreshing table data before expanding row ${rowId}`);
 
-        if (catalogCell) {
-            const catalogInput = catalogCell.querySelector('input');
-            console.log(`🔄 TOGGLE: Catalog input in cell:`, catalogInput);
+    // Wait for refresh to complete, then proceed with expansion
+    await new Promise(resolve => {
+        refreshCurrentTableData();
+        // Wait a bit for refresh to process
+        setTimeout(resolve, 1000);
+    });
 
-            if (catalogInput) {
-                catalogNumber = catalogInput.value;
-                console.log(`🔄 TOGGLE: Catalog from input value: "${catalogNumber}"`);
-            } else {
-                catalogNumber = catalogCell.textContent.trim();
-                console.log(`🔄 TOGGLE: Catalog from cell text: "${catalogNumber}"`);
-            }
-        }
+    // Re-get elements after refresh (they might have been recreated)
+    const refreshedTbody = document.getElementById('items-tbody');
+    const refreshedRow = refreshedTbody.querySelector(`tr[data-row-id="${rowId}"]`);
+    const refreshedExpandBtn = refreshedRow.querySelector('.expand-btn');
 
-        console.log(`🔄 TOGGLE: Initial catalog number: "${catalogNumber}"`);
+    console.log(`🔄 TOGGLE: After refresh - proceeding with expansion`);
 
-        // If no catalog number, try to use a default or skip
-        if (!catalogNumber || catalogNumber === '-' || catalogNumber === '') {
-            catalogNumber = '210'; // Default fallback
-            console.log(`🔄 TOGGLE: Using fallback catalog: "${catalogNumber}"`);
+    // Get the catalog number from the refreshed row (assuming it's in the 3rd cell - קטלוג column)
+    console.log(`🔄 TOGGLE: Getting catalog number from refreshed row, cells:`, refreshedRow.cells);
+
+    let catalogNumber = null;
+    const catalogCell = refreshedRow.cells[2]; // קטלוג column (index 2)
+    console.log(`🔄 TOGGLE: Catalog cell (index 2):`, catalogCell);
+
+    if (catalogCell) {
+        const catalogInput = catalogCell.querySelector('input');
+        console.log(`🔄 TOGGLE: Catalog input in cell:`, catalogInput);
+
+        if (catalogInput) {
+            catalogNumber = catalogInput.value;
+            console.log(`🔄 TOGGLE: Catalog from input value: "${catalogNumber}"`);
         } else {
-            console.log(`🔄 TOGGLE: Using found catalog: "${catalogNumber}"`);
+            catalogNumber = catalogCell.textContent.trim();
+            console.log(`🔄 TOGGLE: Catalog from cell text: "${catalogNumber}"`);
         }
+    }
 
-        // Expand - create new row with rib details
-        const expandedRow = tbody.insertRow(row.rowIndex);
-        expandedRow.classList.add('expanded-row');
-        expandedRow.setAttribute('data-expanded-for', rowId);
+    console.log(`🔄 TOGGLE: Initial catalog number: "${catalogNumber}"`);
 
-        const expandedCell = expandedRow.insertCell(0);
-        expandedCell.colSpan = 10;
+    // If no catalog number, try to use a default or skip
+    if (!catalogNumber || catalogNumber === '-' || catalogNumber === '') {
+        catalogNumber = '210'; // Default fallback
+        console.log(`🔄 TOGGLE: Using fallback catalog: "${catalogNumber}"`);
+    } else {
+        console.log(`🔄 TOGGLE: Using found catalog: "${catalogNumber}"`);
+    }
 
-        // Create rib details table with 1/3 width layout
-        expandedCell.innerHTML = `
+    // Expand - create new row with rib details
+    const expandedRow = refreshedTbody.insertRow(refreshedRow.rowIndex);
+    expandedRow.classList.add('expanded-row');
+    expandedRow.setAttribute('data-expanded-for', rowId);
+
+    const expandedCell = expandedRow.insertCell(0);
+    expandedCell.colSpan = 10;
+
+    // Create rib details table with 1/3 width layout - load rib data async
+    expandedCell.innerHTML = `
             <div class="expanded-row-container">
                 <div class="rib-details-section">
                     <table class="rib-details">
-                        <tbody>
-                            ${generateRibDetails(rowId, catalogNumber)}
+                        <tbody id="rib-tbody-${rowId}">
+                            <tr>
+                                <td colspan="2" style="text-align: center; color: #666;">
+                                    טוען נתוני צלעות...
+                                </td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
                 <div class="shape-template-section">
-                    <div class="template-content" id="shape-template-${catalogNumber}">
+                    <div class="template-content" id="shape-template-${rowId}">
                         ${generateShapeTemplate(catalogNumber)}
                     </div>
                 </div>
             </div>
         `;
 
-        expandBtn.textContent = '−';
-        expandBtn.classList.add('expanded');
+        // Load rib details asynchronously
+        generateRibDetails(rowId, catalogNumber).then(ribHtml => {
+            const ribTbody = document.getElementById(`rib-tbody-${rowId}`);
+            if (ribTbody) {
+                ribTbody.innerHTML = ribHtml;
+            }
+        }).catch(error => {
+            console.error('Error loading rib details:', error);
+            const ribTbody = document.getElementById(`rib-tbody-${rowId}`);
+            if (ribTbody) {
+                ribTbody.innerHTML = `
+                    <tr>
+                        <td colspan="2" style="text-align: center; color: #666;">
+                            שגיאה בטעינת נתוני צלעות
+                        </td>
+                    </tr>
+                `;
+            }
+        });
+
+        refreshedExpandBtn.textContent = '−';
+        refreshedExpandBtn.classList.add('expanded');
 
         // Load the shape template content via AJAX
         console.log(`🔄 TOGGLE: About to load template for catalog: "${catalogNumber}"`);
@@ -1613,13 +1846,28 @@ function toggleRow(rowId) {
             console.log(`🔄 TOGGLE: ✅ Catalog number is valid, calling loadShapeTemplate`);
             // Use setTimeout to ensure DOM is ready
             setTimeout(() => {
-                const templateContainerId = `shape-template-${catalogNumber}`;
+                const templateContainerId = `shape-template-${rowId}`;
                 console.log(`🔄 TOGGLE: Looking for container: ${templateContainerId}`);
                 const testContainer = document.getElementById(templateContainerId);
                 console.log(`🔄 TOGGLE: Container found:`, testContainer);
                 if (testContainer) {
                     loadExpandedShapeTemplate(catalogNumber, templateContainerId)
-                        .then(() => console.log(`🔄 TOGGLE: Template loaded`))
+                        .then(() => {
+                            console.log(`🔄 TOGGLE: Template loaded`);
+                            // Now load rib data from central output file
+                            const tbody = document.getElementById('items-tbody');
+                            const row = tbody ? tbody.rows[parseInt(rowId)] : null;
+
+                            // Get page number from the row's data-page attribute (same as generateRibDetails)
+                            const currentPage = row ? (row.getAttribute('data-page') || '1') : '1';
+
+                            // Get the actual order line number from the table row
+                            const orderLineCell = row ? row.querySelector('input[data-field="מס"]') : null;
+                            const lineNumber = orderLineCell ? orderLineCell.value : (parseInt(rowId) + 1);
+
+                            console.log(`🔄 TOGGLE: Loading rib data for page ${currentPage}, line ${lineNumber} (from row ${rowId})`);
+                            loadTemplateRibData(currentPage, lineNumber, templateContainerId);
+                        })
                         .catch(err => console.error(`🔄 TOGGLE: Template load error:`, err));
                 } else {
                     console.error(`🔄 TOGGLE: Container ${templateContainerId} not found in DOM`);
@@ -1628,7 +1876,6 @@ function toggleRow(rowId) {
         } else {
             console.log(`🔄 TOGGLE: ❌ Catalog number is invalid: "${catalogNumber}"`);
         }
-    }
 }
 
 // Store catalog data globally
@@ -1647,52 +1894,83 @@ async function loadCatalogData() {
     }
 }
 
-// Generate rib details from catalog data
-function generateRibDetails(rowId, catalogNumber) {
-    // Use the passed catalogNumber parameter
-    const shapeNumber = catalogNumber;
+// Generate rib details from central output file data
+async function generateRibDetails(rowId, catalogNumber) {
+    console.log(`[GENERATE RIB DETAILS] Starting for rowId: ${rowId}, catalogNumber: ${catalogNumber}`);
+    // Extract row information from rowId (e.g., "0" means row index 0)
+    const rowIndex = parseInt(rowId);
+    const tbody = document.getElementById('items-tbody');
 
-    let ribHtml = '';
+    if (!tbody || !tbody.rows[rowIndex]) {
+        return `
+            <tr>
+                <td colspan="2" style="text-align: center; color: #666;">
+                    שורה לא נמצאה
+                </td>
+            </tr>
+        `;
+    }
 
-    if (catalogData && catalogData.shapes && catalogData.shapes[shapeNumber]) {
-        const shape = catalogData.shapes[shapeNumber];
-        const ribs = shape.ribs || [];
+    const row = tbody.rows[rowIndex];
+    const pageNumber = row.getAttribute('data-page') || 1;
 
-        ribs.forEach(item => {
-            // Check if it's visible
-            if (item.visible !== false) {
-                let letter = '';
-                let value = Math.floor(Math.random() * 100) + 10; // Still using random for now
+    // Get the actual order line number from the "מס" field in the table row
+    const orderLineCell = row.querySelector('input[data-field="מס"]');
+    const lineNumber = orderLineCell ? orderLineCell.value : (rowIndex + 1);
 
-                // Determine if it's a rib or angle
-                if (item.rib_letter) {
-                    letter = item.rib_letter;
-                } else if (item.angle_letter) {
-                    letter = item.angle_letter;
-                }
+    const orderNumber = getCurrentOrderNumber();
 
+    try {
+        // Fetch real rib data from central output file
+        console.log(`[GENERATE RIB DETAILS] Calling API: /api/rib-data/${orderNumber}/${pageNumber}/${lineNumber}`);
+        const response = await fetch(`/api/rib-data/${orderNumber}/${pageNumber}/${lineNumber}`);
+
+        // Handle 404 responses gracefully - this is expected when specific rib data doesn't exist
+        if (response.status === 404) {
+            console.log(`No specific rib data found for ${orderNumber}/${pageNumber}/${lineNumber}, showing empty ribs`);
+            return `
+                <tr>
+                    <td colspan="2" style="text-align: center; color: #666;">
+                        אין נתוני צלעות
+                    </td>
+                </tr>
+            `;
+        }
+
+        const data = await response.json();
+
+        if (data.success && data.rib_values && Object.keys(data.rib_values).length > 0) {
+            // Use real data from central output file
+            let ribHtml = '';
+            Object.entries(data.rib_values).forEach(([letter, value]) => {
                 ribHtml += `
                     <tr>
                         <td>${letter}</td>
                         <td>${value}</td>
                     </tr>
                 `;
-            }
-        });
-    } else {
-        // Fallback to default if catalog data not available
-        for (let i = 1; i <= 8; i++) {
-            const length = Math.floor(Math.random() * 100) + 10;
-            ribHtml += `
+            });
+            return ribHtml;
+        } else {
+            // No rib data found in central output file - show nothing as requested
+            return `
                 <tr>
-                    <td>${i}</td>
-                    <td>${length}</td>
+                    <td colspan="2" style="text-align: center; color: #666;">
+                        אין נתוני צלעות
+                    </td>
                 </tr>
             `;
         }
+    } catch (error) {
+        console.error('Error fetching rib data:', error);
+        return `
+            <tr>
+                <td colspan="2" style="text-align: center; color: #666;">
+                    שגיאה בטעינת נתוני צלעות
+                </td>
+            </tr>
+        `;
     }
-
-    return ribHtml;
 }
 
 // Generate shape template display
@@ -1792,6 +2070,61 @@ async function loadExpandedShapeTemplate(catalogNumber, containerId) {
             </div>
         `;
         return Promise.reject(error);
+    }
+}
+
+// Load rib data from central output file and populate template input fields
+async function loadTemplateRibData(pageNumber, lineNumber, containerId) {
+    console.log(`%c[LOAD TEMPLATE RIB DATA - SIMPLIFIED] Loading rib data for page ${pageNumber}, line ${lineNumber}, container: ${containerId}`, 'background: yellow; color: red; font-weight: bold;');
+
+    try {
+        const orderNumber = getCurrentOrderNumber();
+        console.log(`[LOAD TEMPLATE RIB DATA] Calling API: /api/rib-data/${orderNumber}/${pageNumber}/${lineNumber}`);
+        const response = await fetch(`/api/rib-data/${orderNumber}/${pageNumber}/${lineNumber}`);
+
+        console.log(`[LOAD TEMPLATE RIB DATA] API Response status: ${response.status}`);
+        const data = await response.json();
+        console.log(`[LOAD TEMPLATE RIB DATA] API Response data:`, data);
+
+        if (data.success && data.rib_values) {
+            console.log(`%c[RIB DATA SUCCESS] Received rib values for line ${lineNumber}:`, 'color: green; font-weight: bold;', data.rib_values);
+
+            // Find the template container
+            const container = document.getElementById(containerId);
+            if (!container) {
+                console.error(`%c[TEMPLATE ERROR] Container ${containerId} not found in DOM`, 'color: red; font-weight: bold;');
+                return;
+            }
+
+            console.log(`%c[TEMPLATE FOUND] Container ${containerId} found, looking for input fields...`, 'color: blue;');
+
+            // Find all input fields in the template and populate them using name attributes
+            const inputFields = container.querySelectorAll('input[type="text"][name]');
+            console.log(`%c[TEMPLATE INPUTS] Found ${inputFields.length} input fields in container`, 'color: blue;',
+                Array.from(inputFields).map(input => ({ name: input.name, id: input.id, currentValue: input.value })));
+
+            let populatedCount = 0;
+            inputFields.forEach(input => {
+                const ribLetter = input.name; // Get the rib letter from the name attribute
+                console.log(`[TEMPLATE FIELD] Processing field: name="${ribLetter}", id="${input.id}", current value="${input.value}"`);
+
+                if (ribLetter && data.rib_values[ribLetter]) {
+                    const value = data.rib_values[ribLetter];
+                    const oldValue = input.value;
+                    input.value = value;
+                    populatedCount++;
+                    console.log(`%c[TEMPLATE POPULATE SUCCESS] Field "${ribLetter}" updated: "${oldValue}" → "${value}"`, 'color: green; font-weight: bold;');
+                } else {
+                    console.log(`[TEMPLATE FIELD] No data for field "${ribLetter}" - keeping existing value: "${input.value}"`);
+                }
+            });
+
+            console.log(`%c[TEMPLATE COMPLETE] Successfully populated ${populatedCount} fields in container ${containerId}`, 'color: green; font-weight: bold;');
+        } else {
+            console.error(`%c[RIB DATA ERROR] API failed or no rib data:`, 'color: red; font-weight: bold;', data);
+        }
+    } catch (error) {
+        console.error(`%c[RIB DATA EXCEPTION] Error loading rib data:`, 'color: red; font-weight: bold;', error);
     }
 }
 
@@ -3273,6 +3606,9 @@ async function saveTableCell(pageNumber, rowIndex, fieldName, newValue) {
 
             // Update expanded table if catalog field was changed
             if (fieldName === 'קטלוג') {
+                // Call Form1dat2 API to update catalog data in central output file
+                updateCatalogNumber(pageNumber, rowIndex + 1, newValue);
+
                 updateExpandedTablesForRow(pageNumber, rowIndex, newValue);
             }
 
@@ -3310,9 +3646,32 @@ function updateExpandedTablesForRow(pageNumber, rowIndex, newCatalogNumber) {
         // Row is expanded, find the rib details section and update it
         const ribDetailsSection = expandedRow.querySelector('.rib-details-section tbody');
         if (ribDetailsSection) {
-            // Generate new rib details with the updated catalog number
-            const newRibDetails = generateRibDetails(rowId, newCatalogNumber);
-            ribDetailsSection.innerHTML = newRibDetails;
+            // Show loading message
+            ribDetailsSection.innerHTML = `
+                <tr>
+                    <td colspan="2" style="text-align: center; color: #666;">
+                        טוען נתוני צלעות...
+                    </td>
+                </tr>
+            `;
+
+            // Generate new rib details with the updated catalog number asynchronously
+            generateRibDetails(rowId, newCatalogNumber).then(newRibDetails => {
+                if (ribDetailsSection) {
+                    ribDetailsSection.innerHTML = newRibDetails;
+                }
+            }).catch(error => {
+                console.error('Error updating rib details:', error);
+                if (ribDetailsSection) {
+                    ribDetailsSection.innerHTML = `
+                        <tr>
+                            <td colspan="2" style="text-align: center; color: #666;">
+                                שגיאה בטעינת נתוני צלעות
+                            </td>
+                        </tr>
+                    `;
+                }
+            });
         }
 
         // Also update the shape template
@@ -3323,7 +3682,15 @@ function updateExpandedTablesForRow(pageNumber, rowIndex, newCatalogNumber) {
 
             // Load the actual template content via AJAX
             if (newCatalogNumber && newCatalogNumber !== '-' && newCatalogNumber !== '') {
-                loadShapeTemplate(newCatalogNumber, `shape-template-${newCatalogNumber}`);
+                // Use the correct function and find the actual template container ID
+                const templateContainer = templateSection.querySelector('div') || templateSection;
+                const containerId = templateContainer.id || `template-${rowIndex + 1}-${new Date().getTime()}`;
+                if (!templateContainer.id) {
+                    templateContainer.id = containerId;
+                }
+
+                console.log(`[TEMPLATE UPDATE] Loading template for catalog ${newCatalogNumber}, container: ${containerId}`);
+                loadExpandedShapeTemplate(newCatalogNumber, containerId);
             }
         }
 
@@ -3484,97 +3851,129 @@ function updateCatalogImage(catalogNumber, rowId) {
 function runShapeIdentification(rowId) {
     console.log('Shape identification started', rowId ? `for row: ${rowId}` : 'for all shapes');
 
-    // Handle both global and row-specific identification
-    let button;
-    if (rowId) {
-        // Find the specific button for this row
-        button = document.querySelector(`button[onclick*="${rowId}"]`);
-    } else {
-        // Global identification button (if it exists)
-        button = document.getElementById('identify-shapes-btn');
+    if (!rowId) {
+        console.log('Global shape identification not yet implemented');
+        alert('זיהוי כללי של צורות יתווסף בגרסה הבאה');
+        return;
     }
 
-    if (!button) return;
+    // Find the specific button for this row
+    const button = document.querySelector(`button[onclick*="${rowId}"]`);
+    if (!button) {
+        console.error(`Button not found for row: ${rowId}`);
+        return;
+    }
 
     // Disable button during processing
     button.disabled = true;
 
     // Change button appearance to show processing
-    const originalSVG = button.innerHTML;
-    button.innerHTML = `
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2V6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M12 18V22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M4.93 4.93L7.76 7.76" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M16.24 16.24L19.07 19.07" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M2 12H6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M18 12H22" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M4.93 19.07L7.76 16.24" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M16.24 7.76L19.07 4.93" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-    `;
-
-    // Add spinning animation
-    const svg = button.querySelector('svg');
-    if (svg) {
-        svg.style.animation = 'spin 1s linear infinite';
-    }
+    const originalText = button.textContent;
+    button.textContent = '...';
+    button.style.backgroundColor = '#fbbf24';
 
     // Update shapes status
     const shapesStatus = document.getElementById('shapes-status');
     if (shapesStatus) {
-        shapesStatus.textContent = 'מזהה צורות...';
+        shapesStatus.textContent = 'מזהה צורה...';
     }
 
     // Create notification for shape identification process
-    const notificationTitle = rowId ? 'זיהוי צורה בודדת' : 'זיהוי צורות';
-    const notificationMessage = rowId ? `מזהה צורה ${rowId}...` : 'מתחיל תהליך זיהוי צורות...';
+    const notificationTitle = 'זיהוי צורה בודדת';
+    const notificationMessage = `מזהה צורה ${rowId}...`;
 
     createProgressNotification(
-        rowId ? `shape-identification-${rowId}` : 'shape-identification',
+        `shape-identification-${rowId}`,
         notificationTitle,
         notificationMessage,
         'processing'
     );
 
-    // Simulate shape identification process
-    setTimeout(() => {
-        // Update notification
-        const processingMessage = rowId ? `מעבד צורה ${rowId}...` : 'מעבד תמונות צורות...';
-        updateProgressNotification(
-            rowId ? `shape-identification-${rowId}` : 'shape-identification',
-            notificationTitle,
-            processingMessage,
-            'processing'
-        );
+    // Call the API to run Form1OCR3 agent
+    fetch('/api/run-shape-identification', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            row_id: rowId
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log('Shape identification response:', data);
 
-        setTimeout(() => {
-            // Complete the process
-            const completedTitle = rowId ? 'זיהוי צורה הושלם' : 'זיהוי צורות הושלם';
-            const completedMessage = rowId ? `זוהה צורה ${rowId} בהצלחה` : 'זוהו 5 צורות בהצלחה';
+        if (data.success) {
+            // Success notification
+            const completedMessage = `זוהו ${data.mappings_found} מיפויים, עודכנו ${data.values_updated} ערכים`;
             updateProgressNotification(
-                rowId ? `shape-identification-${rowId}` : 'shape-identification',
-                completedTitle,
+                `shape-identification-${rowId}`,
+                'זיהוי צורה הושלם',
                 completedMessage,
                 'success'
             );
 
             // Update shapes status
             if (shapesStatus) {
-                shapesStatus.textContent = 'הושלם';
+                shapesStatus.textContent = `הושלם - ${data.values_updated} ערכים`;
             }
 
-            // Restore button
-            button.disabled = false;
-            button.innerHTML = originalSVG;
+            // Optionally refresh the expanded row to show updated values
+            console.log('Mappings found:', data.mappings);
 
-            // Load identified shapes (placeholder data) - only for global identification
-            if (!rowId) {
-                loadIdentifiedShapes();
+            // Auto-hide notification after 3 seconds
+            setTimeout(() => {
+                removeProgressNotification(`shape-identification-${rowId}`);
+            }, 3000);
+
+        } else {
+            // Error notification
+            updateProgressNotification(
+                `shape-identification-${rowId}`,
+                'שגיאה בזיהוי צורה',
+                data.error || 'שגיאה לא ידועה',
+                'error'
+            );
+
+            // Update shapes status
+            if (shapesStatus) {
+                shapesStatus.textContent = 'שגיאה';
             }
 
-        }, 2000);
-    }, 1500);
+            console.error('Shape identification failed:', data.error);
+
+            // Auto-hide error notification after 5 seconds
+            setTimeout(() => {
+                removeProgressNotification(`shape-identification-${rowId}`);
+            }, 5000);
+        }
+    })
+    .catch(error => {
+        console.error('API call failed:', error);
+
+        updateProgressNotification(
+            `shape-identification-${rowId}`,
+            'שגיאה בזיהוי צורה',
+            'שגיאה בחיבור לשרת',
+            'error'
+        );
+
+        // Update shapes status
+        if (shapesStatus) {
+            shapesStatus.textContent = 'שגיאת חיבור';
+        }
+
+        // Auto-hide error notification after 5 seconds
+        setTimeout(() => {
+            removeProgressNotification(`shape-identification-${rowId}`);
+        }, 5000);
+    })
+    .finally(() => {
+        // Restore button
+        button.disabled = false;
+        button.textContent = originalText;
+        button.style.backgroundColor = '';
+    });
 }
 
 function loadIdentifiedShapes() {

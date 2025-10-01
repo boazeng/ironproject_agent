@@ -12,7 +12,7 @@ class Form1S4_1Agent:
     """
     Form1S4_1 Agent - Full Drawing Column Extraction
     Extracts the complete drawing column (6th column between 6th and 7th vertical lines)
-    Input: Output from form1s3 agent (green grid lines image)
+    Input: Output from form1s2 agent (table_bodyonly image)
     Output: Full drawing column image saved to shape_column folder
     """
 
@@ -43,16 +43,16 @@ class Form1S4_1Agent:
             if file_path is None:
                 logger.info(f"[{self.short_name.upper()}] Auto-detecting form1s3 output files...")
 
-                # Look for files matching pattern *_gridlines.png in the grid directory
-                pattern = os.path.join(self.output_dir, "table_detection", "grid", "*_gridlines.png")
+                # Look for files matching pattern *_table_bodyonly_*.png in the table directory
+                pattern = os.path.join(self.output_dir, "table_detection", "table", "*_table_bodyonly_*.png")
                 import glob
                 files = glob.glob(pattern)
 
                 if not files:
-                    logger.error(f"[{self.short_name.upper()}] No form1s3 output files found")
+                    logger.error(f"[{self.short_name.upper()}] No form1s2 output files found")
                     return {
                         "status": "error",
-                        "error": "No form1s3 output files found",
+                        "error": "No form1s2 output files found",
                         "agent": self.name
                     }
 
@@ -63,9 +63,9 @@ class Form1S4_1Agent:
             # Extract order name from file path if not provided
             if order_name is None:
                 base_name = os.path.basename(file_path)
-                # Extract order name from patterns like CO25S006375_ordertable_page1_gridlines.png
-                if "_ordertable_" in base_name:
-                    order_name = base_name.split("_ordertable_")[0]
+                # Extract order name from patterns like CO25S006375_table_bodyonly_page1.png
+                if "_table_bodyonly_" in base_name:
+                    order_name = base_name.split("_table_bodyonly_")[0]
                 elif "_gridlines" in base_name:
                     order_name = base_name.split("_")[0]
                 elif "_page" in base_name:
@@ -190,7 +190,7 @@ class Form1S4_1Agent:
 
             logger.info(f"[{self.short_name.upper()}] Found {len(horizontal_lines)} potential horizontal lines")
 
-            if len(vertical_lines) >= 7 and len(horizontal_lines) >= 2:
+            if len(vertical_lines) >= 2:  # Only need 2 vertical lines to find a column
                 # Group consecutive vertical lines (lines within 10 pixels of each other)
                 vertical_line_groups = []
                 current_group = [vertical_lines[0]]
@@ -228,24 +228,31 @@ class Form1S4_1Agent:
 
                 logger.info(f"[{self.short_name.upper()}] Identified {len(horizontal_line_groups)} distinct horizontal line groups")
 
-                # We need at least 7 vertical line groups and at least 2 horizontal line groups
-                if len(vertical_line_groups) >= 7 and len(horizontal_line_groups) >= 2:
-                    # Get the average X position for the 6th and 7th vertical line groups
-                    sixth_line_x = int(np.mean(vertical_line_groups[5]))  # 6th line (0-indexed)
-                    seventh_line_x = int(np.mean(vertical_line_groups[6]))  # 7th line (0-indexed)
+                # Find the widest column (likely the drawing column)
+                if len(vertical_line_groups) >= 2:
+                    # Find the widest gap between consecutive vertical line groups
+                    widest_gap = 0
+                    left_x = 0
+                    right_x = img.shape[1]
 
-                    # Get the first and last horizontal line groups for table boundaries
-                    first_horizontal_y = int(np.mean(horizontal_line_groups[0]))  # Top boundary
-                    last_horizontal_y = int(np.mean(horizontal_line_groups[-1]))  # Bottom boundary
+                    for i in range(len(vertical_line_groups) - 1):
+                        gap_start = int(np.mean(vertical_line_groups[i]))
+                        gap_end = int(np.mean(vertical_line_groups[i + 1]))
+                        gap_width = gap_end - gap_start
 
-                    logger.info(f"[{self.short_name.upper()}] 6th vertical line at X={sixth_line_x}, 7th at X={seventh_line_x}")
-                    logger.info(f"[{self.short_name.upper()}] Top horizontal line at Y={first_horizontal_y}, Bottom at Y={last_horizontal_y}")
+                        if gap_width > widest_gap and gap_width > 200:  # Minimum reasonable width for drawing column
+                            widest_gap = gap_width
+                            left_x = gap_start
+                            right_x = gap_end
 
-                    # The drawing column is between these boundaries
-                    left_x = sixth_line_x + len(vertical_line_groups[5])  # Start after the 6th green line
-                    right_x = seventh_line_x  # End at the 7th green line
-                    top_y = first_horizontal_y + len(horizontal_line_groups[0])  # Start after the top green line
-                    bottom_y = last_horizontal_y  # End at the bottom green line
+                    # Always use full height to ensure we never miss any rows
+                    top_y = 0
+                    bottom_y = img.shape[0]
+
+                    logger.info(f"[{self.short_name.upper()}] Using full height to ensure all rows are captured")
+
+                    logger.info(f"[{self.short_name.upper()}] Drawing column boundaries: X={left_x} to X={right_x} (width={right_x-left_x})")
+                    logger.info(f"[{self.short_name.upper()}] Height boundaries: Y={top_y} to Y={bottom_y} (height={bottom_y-top_y})")
 
                     # Ensure valid boundaries
                     left_x = max(0, left_x)
@@ -253,7 +260,7 @@ class Form1S4_1Agent:
                     top_y = max(0, top_y)
                     bottom_y = min(img.shape[0], bottom_y)
 
-                    # Extract the column within table boundaries
+                    # Extract the column within boundaries
                     column_img = img[top_y:bottom_y, left_x:right_x]
 
                     logger.info(f"[{self.short_name.upper()}] Extracted column: {column_img.shape[1]}x{column_img.shape[0]} pixels")
@@ -261,9 +268,9 @@ class Form1S4_1Agent:
 
                     return column_img
                 else:
-                    logger.warning(f"[{self.short_name.upper()}] Not enough line groups found (need >=7 vertical, >=2 horizontal, found {len(vertical_line_groups)} vertical, {len(horizontal_line_groups)} horizontal)")
+                    logger.warning(f"[{self.short_name.upper()}] Not enough vertical line groups found (need >=2, found {len(vertical_line_groups)})")
             else:
-                logger.warning(f"[{self.short_name.upper()}] Not enough lines detected (need >=7 vertical, >=2 horizontal, found {len(vertical_lines)} vertical, {len(horizontal_lines)} horizontal)")
+                logger.warning(f"[{self.short_name.upper()}] Not enough lines detected (need >=2 vertical, found {len(vertical_lines)} vertical, {len(horizontal_lines)} horizontal)")
 
             # If we couldn't detect lines properly, return None
             logger.error(f"[{self.short_name.upper()}] Failed to detect drawing column properly")
@@ -284,19 +291,19 @@ class Form1S4_1Agent:
             list: Results for all processed files
         """
         if input_dir is None:
-            input_dir = os.path.join(self.output_dir, "table_detection", "grid")
+            input_dir = os.path.join(self.output_dir, "table_detection", "table")
 
         logger.info(f"[{self.short_name.upper()}] Starting batch processing from: {input_dir}")
 
         results = []
 
-        # Find all form1s3 output files
+        # Find all form1s2 output files
         import glob
-        pattern = os.path.join(input_dir, "*_gridlines.png")
+        pattern = os.path.join(input_dir, "*_table_bodyonly_*.png")
         files = glob.glob(pattern)
 
         if not files:
-            logger.warning(f"[{self.short_name.upper()}] No form1s3 output files found in {input_dir}")
+            logger.warning(f"[{self.short_name.upper()}] No form1s2 output files found in {input_dir}")
             return results
 
         logger.info(f"[{self.short_name.upper()}] Found {len(files)} file(s) to process")

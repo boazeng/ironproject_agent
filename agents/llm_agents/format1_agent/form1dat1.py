@@ -470,6 +470,135 @@ class Form1Dat1Agent:
             print(f"[ERROR] Error retrieving section data: {str(e)}")
             return None
 
+    def _initialize_ribs_from_catalog(self, shape_catalog_number: str) -> dict:
+        """
+        Initialize ribs structure based on catalog format
+        Sets 90-degree angles to value 90, all other ribs/angles to NULL
+
+        Args:
+            shape_catalog_number: The catalog number for the shape
+
+        Returns:
+            dict: Initialized ribs structure
+        """
+        ribs = {}
+
+        try:
+            # Load catalog format
+            catalog_path = Path("io/catalog/catalog_format.json")
+            if not catalog_path.exists():
+                print(f"[WARNING] Catalog format file not found")
+                return ribs
+
+            with open(catalog_path, 'r', encoding='utf-8') as f:
+                catalog_data = json.load(f)
+
+            # Get shape data
+            shape_data = catalog_data.get('shapes', {}).get(shape_catalog_number, {})
+            if not shape_data:
+                print(f"[WARNING] Shape {shape_catalog_number} not found in catalog")
+                return ribs
+
+            # Process ribs
+            catalog_ribs = shape_data.get('ribs', [])
+            for i, rib_data in enumerate(catalog_ribs, 1):
+                item_key = f"item_{i}"
+
+                if 'rib_letter' in rib_data:
+                    # Regular rib - set to NULL
+                    ribs[item_key] = {
+                        "rib_letter": rib_data['rib_letter'],
+                        "value": "NULL",
+                        "visible": rib_data.get('visible', False)
+                    }
+                elif 'angle_letter' in rib_data:
+                    # Angle - check if 90 degree (handle both 'angle_type' and 'angle type' keys)
+                    angle_type = rib_data.get('angle_type', '') or rib_data.get('angle type', '')
+                    value = "90" if angle_type == "90" else "NULL"
+
+                    ribs[item_key] = {
+                        "angle_letter": rib_data['angle_letter'],
+                        "value": value,
+                        "visible": rib_data.get('visible', False),
+                        "is_90_degree": (angle_type == "90")
+                    }
+
+            print(f"[INFO] Initialized {len(ribs)} ribs for shape {shape_catalog_number}")
+
+        except Exception as e:
+            print(f"[ERROR] Error initializing ribs from catalog: {str(e)}")
+
+        return ribs
+
+    def update_existing_order_ribs(self, order_number: str) -> bool:
+        """
+        Update existing order with initialized ribs based on catalog format
+        This is used to update orders that were created before rib initialization was implemented
+
+        Args:
+            order_number: The order number identifier
+
+        Returns:
+            bool: Success status
+        """
+        try:
+            file_path = self.json_output_path / f"{order_number}_out.json"
+
+            if not file_path.exists():
+                print(f"[ERROR] Order {order_number} not found")
+                return False
+
+            # Load current data
+            with open(file_path, 'r', encoding='utf-8') as f:
+                order_data = json.load(f)
+
+            # Check if Section 3 exists
+            if "section_3_shape_analysis" not in order_data:
+                print(f"[WARNING] Section 3 not found in order {order_number}")
+                return False
+
+            section3_data = order_data["section_3_shape_analysis"]
+            updated = False
+
+            # Process each page
+            for page_key, page_data in section3_data.items():
+                if not isinstance(page_data, dict) or "order_lines" not in page_data:
+                    continue
+
+                # Process each line
+                for line_key, line_data in page_data["order_lines"].items():
+                    if not isinstance(line_data, dict):
+                        continue
+
+                    # Get shape catalog number
+                    shape_catalog = line_data.get('shape_catalog_number', '')
+
+                    # Ribs should remain empty - other agents will populate them when needed
+                    # Auto-population disabled to keep ribs empty as requested
+                    pass
+
+            # Save updated data if changes were made
+            if updated:
+                # Update metadata
+                order_data["section_1_general"]["date_modified"] = datetime.now().isoformat()
+
+                # Save to file
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    json.dump(order_data, f, indent=2, ensure_ascii=False)
+
+                # Update cache
+                self.data_cache[f"{order_number}_main"] = order_data
+
+                print(f"[OK] Updated ribs for order {order_number}")
+                return True
+            else:
+                print(f"[INFO] No rib updates needed for order {order_number}")
+                return True
+
+        except Exception as e:
+            print(f"[ERROR] Error updating existing order ribs: {str(e)}")
+            return False
+
     def integrate_table_ocr_files(self, order_number: str) -> bool:
         """
         Integrate all table_ocr files for an order into Section 3 of the database
@@ -488,7 +617,7 @@ class Form1Dat1Agent:
             self.initialize_order(order_number)
 
             # Path to table_ocr files
-            table_ocr_path = self.base_output_path / "table_detection" / "Table_ocr"
+            table_ocr_path = self.base_output_path / "table_detection" / "table_ocr"
 
             # Find all table_ocr files for this order
             import glob
@@ -541,18 +670,26 @@ class Form1Dat1Agent:
                         line_key = f"line_{line_number}"
 
                         # Extract data according to database structure
+                        # Get values and replace empty with "NA"
+                        shape_catalog = row_data.get('קטלוג', '')
+                        shape_desc = row_data.get('shape', '')
+
+                        # Form1dat1 always sets ribs to empty - other agents will populate them when needed
+                        ribs = {}  # Always empty - ribs should remain empty until manually populated
+
                         section3_data[page_key]["order_lines"][line_key] = {
-                            "line_number": line_number,
+                            "line_number": int(row_data.get('row_number', line_number)) if str(row_data.get('row_number', '')).isdigit() else line_number,  # Use row_number field from OCR
                             "order_line_no": row_data.get('מס', ''),
-                            "shape_number": row_data.get('shape', ''),
-                            "number_of_ribs": 0,  # Default, will be updated when shape analysis is available
+                            "shape_catalog_number": "NA",  # Always NA - will be updated by Form1dat2 agent
+                            "shape_description": "NA",  # Always NA - will be updated by Form1dat2 agent
+                            "number_of_ribs": "NA",  # Always NA - will be updated when shape analysis is available
                             "diameter": row_data.get('קוטר', ''),
                             "number_of_units": self._safe_int_convert(row_data.get('סהכ יחידות', '')),
                             "length": row_data.get('אורך', ''),  # Length field from table_ocr
                             "weight": row_data.get('משקל', ''),  # Weight field from table_ocr
                             "notes": row_data.get('הערות', ''),  # Notes field from table_ocr
                             "checked": False,  # User verification status - default false
-                            "ribs": {}  # Will be populated when shape analysis is available
+                            "ribs": ribs  # Initialized based on catalog format
                         }
 
                         try:
@@ -666,3 +803,57 @@ class Form1Dat1Agent:
         except Exception as e:
             print(f"[ERROR] Error updating checked status: {str(e)}")
             return False
+
+    def process_order(self, order_number: str) -> Dict[str, Any]:
+        """
+        Main processing method for an order - integrates all table OCR data into the central database
+
+        Args:
+            order_number: The order number identifier
+
+        Returns:
+            Dict: Processing result with status and details
+        """
+        try:
+            print(f"[FORM1DAT1] Processing order: {order_number}")
+
+            # Delete existing output file first to ensure clean rebuild
+            output_file_path = self.json_output_path / f"{order_number}_out.json"
+            if output_file_path.exists():
+                output_file_path.unlink()
+                print(f"[INFO] Deleted existing output file: {output_file_path}")
+
+            # Initialize the order in the database (now guaranteed to be new)
+            if not self.initialize_order(order_number):
+                return {
+                    "status": "error",
+                    "error": "Failed to initialize order in database"
+                }
+
+            # Integrate all table OCR files into Section 3
+            integration_success = self.integrate_table_ocr_files(order_number)
+
+            if integration_success:
+                print(f"[FORM1DAT1] Successfully integrated table OCR data for order {order_number}")
+
+                # Get the final output file path
+                output_file = self.json_output_path / f"{order_number}_out.json"
+
+                return {
+                    "status": "success",
+                    "output_file": str(output_file),
+                    "message": f"Order {order_number} processed successfully with table OCR integration"
+                }
+            else:
+                return {
+                    "status": "error",
+                    "error": "Failed to integrate table OCR files"
+                }
+
+        except Exception as e:
+            error_msg = f"Failed to process order {order_number}: {str(e)}"
+            print(f"[FORM1DAT1] [ERROR] {error_msg}")
+            return {
+                "status": "error",
+                "error": error_msg
+            }

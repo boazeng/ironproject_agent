@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git commit:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "Bash(timeout:*)",
+      "Bash(python:*)",
+      "Bash(dir \"C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\templates\\shapes\")",
+      "Bash(node:*)",
+      "Bash(git add:*)",
+      "Bash(git push:*)",
+      "Bash(wmic:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(dir \"C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\io\")",
+      "Bash(dir:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

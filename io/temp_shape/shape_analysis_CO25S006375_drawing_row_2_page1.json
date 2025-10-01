@@ -1,0 +1,18 @@
+{
+  "total_lines": 1,
+  "lines": [
+    {
+      "line_number": 1,
+      "length": 450,
+      "angle_to_next": "unknown"
+    }
+  ],
+  "metadata": {
+    "image_path": "C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\io\\temp_shape\\CO25S006375_drawing_row_2_page1.png",
+    "image_name": "CO25S006375_drawing_row_2_page1.png",
+    "timestamp": "2025-09-24T15:30:54.706400",
+    "model_used": "gpt-4o",
+    "agent": "shape1s2",
+    "opencv_detected_lines": 3
+  }
+}

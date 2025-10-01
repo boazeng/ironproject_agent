@@ -480,9 +480,21 @@ class Form1S4Agent:
             if not column_scores:
                 logger.warning(f"[{self.name.upper()}] No valid columns found for analysis")
                 print(f"[DEBUG] Trying to analyze all columns for drawing content...")
-                # Force analysis of Column 11 anyway since we know it's the target
-                print(f"[DEBUG] Forcing selection of Column 11 as fallback")
-                return 11
+                # Force analysis of the widest column since it likely contains drawings
+                widest_col = None
+                max_width = 0
+                for col_idx in range(len(vertical_lines) - 1):
+                    width = vertical_lines[col_idx + 1] - vertical_lines[col_idx]
+                    if width > max_width and width > 500:  # Minimum reasonable width
+                        max_width = width
+                        widest_col = col_idx
+
+                if widest_col is not None:
+                    print(f"[DEBUG] Forcing selection of widest column {widest_col} (width={max_width}px) as fallback")
+                    return widest_col
+                else:
+                    print(f"[DEBUG] Forcing selection of Column 10 as last resort")
+                    return 10
 
             # Show all available columns for user to verify
             print(f"[DEBUG] === AVAILABLE COLUMNS ===")
@@ -493,15 +505,35 @@ class Form1S4Agent:
                 line_nums = f"lines {col_idx+1}-{col_idx+2}"
                 print(f"[DEBUG] Column {col_idx} (between {line_nums}): x={left_x} to x={right_x}, width={width}px")
 
-            # User specified Column 11 which is the large content column
-            # Column 11 is between lines 12-13: x=991 to x=2290, width=1299px
-            best_column = 11  # Column 11 as specified by user
-            best_score = column_scores.get(11, 0)  # Use 0 if no score
+            # Find the column with the highest score (likely contains drawings)
+            best_column = max(column_scores.items(), key=lambda x: x[1])[0]
+            best_score = column_scores[best_column]
 
-            left_boundary = vertical_lines[11]  # 12th vertical line
-            right_boundary = vertical_lines[12]  # 13th vertical line
-            logger.info(f"[{self.name.upper()}] Using Column 11 as specified: x={left_boundary} to x={right_boundary}")
-            print(f"[DEBUG] SELECTED: Column {best_column} (lines 12-13): x={left_boundary} to x={right_boundary}")
+            # Additional check: prefer the widest column if scores are very close
+            sorted_scores = sorted(column_scores.items(), key=lambda x: x[1], reverse=True)
+            if len(sorted_scores) >= 2:
+                score_diff = sorted_scores[0][1] - sorted_scores[1][1]
+                if score_diff < 0.3:  # Very close scores
+                    # Check column widths and prefer the wider one
+                    top_columns = [col for col, score in sorted_scores[:3]]
+                    widest_col = None
+                    max_width = 0
+                    for col in top_columns:
+                        if col + 1 < len(vertical_lines):
+                            width = vertical_lines[col + 1] - vertical_lines[col]
+                            if width > max_width and width > 500:  # Minimum reasonable width
+                                max_width = width
+                                widest_col = col
+
+                    if widest_col is not None:
+                        best_column = widest_col
+                        best_score = column_scores[widest_col]
+                        print(f"[DEBUG] Selected wider column {best_column} (width={max_width}px) due to close scores")
+
+            left_boundary = vertical_lines[best_column]
+            right_boundary = vertical_lines[best_column + 1]
+            logger.info(f"[{self.name.upper()}] Auto-detected drawing column {best_column}: x={left_boundary} to x={right_boundary}")
+            print(f"[DEBUG] SELECTED: Column {best_column}: x={left_boundary} to x={right_boundary}, width={right_boundary-left_boundary}px")
 
             # Show all column scores for debugging
             print(f"[DEBUG] === COLUMN SCORES ===")
@@ -814,6 +846,126 @@ class Form1S4Agent:
             logger.error(f"[{self.name.upper()}] Error extracting drawing cells: {str(e)}")
             return []
 
+    def extract_cells_from_shape_column(self, column_image, horizontal_lines):
+        """
+        Extract individual shape cells from a shape column image.
+
+        Args:
+            column_image: The shape column image
+            horizontal_lines: Sorted list of horizontal line y-positions
+
+        Returns:
+            List of dictionaries containing cell info and cropped images
+        """
+        try:
+            extracted_cells = []
+            height, width = column_image.shape[:2]
+
+            print(f"[DEBUG] Shape column dimensions: {width}x{height}")
+            print(f"[DEBUG] Horizontal lines: {horizontal_lines}")
+
+            # Calculate minimum row height based on image size and number of lines
+            if len(horizontal_lines) > 2:
+                avg_row_height = height / (len(horizontal_lines) - 1)
+                min_row_height = max(20, avg_row_height * 0.3)
+            else:
+                min_row_height = 50
+
+            print(f"[DEBUG] Minimum row height threshold: {min_row_height}")
+
+            sequential_row_num = 1
+
+            # Process all rows including first and last rows
+            all_rows = []
+
+            # First row: from image top to first green line
+            if len(horizontal_lines) > 0:
+                all_rows.append((0, horizontal_lines[0]))
+
+            # Middle rows: between consecutive horizontal lines
+            for i in range(len(horizontal_lines) - 1):
+                all_rows.append((horizontal_lines[i], horizontal_lines[i + 1]))
+
+            # Last row: from last green line to image bottom
+            if len(horizontal_lines) > 0:
+                all_rows.append((horizontal_lines[-1], height))
+
+            print(f"[DEBUG] Total rows to process: {len(all_rows)} (including first and last rows)")
+
+            # Process all rows
+            for row_idx, (top_y, bottom_y) in enumerate(all_rows):
+                row_height = bottom_y - top_y
+
+                print(f"[DEBUG] Processing row {row_idx+1}: from y={top_y} to y={bottom_y} (height={row_height})")
+
+                # Skip rows that are too small
+                if row_height < min_row_height:
+                    print(f"[DEBUG] Skipping row {row_idx+1} - too small (height={row_height}px < {min_row_height}px)")
+                    continue
+
+                # Add margin to avoid grid lines
+                cell_left = self.margin
+                cell_right = width - self.margin
+                cell_top = top_y + self.margin
+                cell_bottom = bottom_y - self.margin
+
+                # Ensure valid bounds
+                cell_left = max(0, cell_left)
+                cell_right = min(width, cell_right)
+                cell_top = max(0, cell_top)
+                cell_bottom = min(height, cell_bottom)
+
+                # Check if dimensions are valid
+                if cell_right <= cell_left or cell_bottom <= cell_top:
+                    print(f"[DEBUG] Invalid cell dimensions for row {row_idx+1}")
+                    continue
+
+                # Crop the cell
+                cell_image = column_image[cell_top:cell_bottom, cell_left:cell_right]
+
+                # Check if cell is empty by looking for actual content (drawings, text, etc.)
+                gray_cell = cv2.cvtColor(cell_image, cv2.COLOR_BGR2GRAY)
+                mean_intensity = np.mean(gray_cell)
+
+                # Calculate variance to detect if there's actual content (drawings have variation)
+                intensity_variance = np.var(gray_cell)
+
+                print(f"[DEBUG] Row {row_idx+1}: cell {cell_image.shape}, intensity {mean_intensity:.1f}, variance {intensity_variance:.1f}")
+
+                # Skip cells that are both very white AND have very low variance (truly empty)
+                if mean_intensity > 248 and intensity_variance < 50:
+                    print(f"[DEBUG] Skipping empty cell in row {row_idx+1} (intensity: {mean_intensity:.1f}, variance: {intensity_variance:.1f})")
+                    sequential_row_num += 1
+                    continue
+
+                cell_info = {
+                    "row_index": sequential_row_num,
+                    "coordinates": {
+                        "left": int(cell_left),
+                        "right": int(cell_right),
+                        "top": int(cell_top),
+                        "bottom": int(cell_bottom)
+                    },
+                    "dimensions": {
+                        "width": int(cell_right - cell_left),
+                        "height": int(cell_bottom - cell_top)
+                    },
+                    "mean_intensity": float(mean_intensity),
+                    "cell_image": cell_image
+                }
+
+                extracted_cells.append(cell_info)
+                logger.info(f"[{self.name.upper()}] Extracted shape cell #{sequential_row_num}: {cell_info['dimensions']['width']}x{cell_info['dimensions']['height']} px, intensity: {mean_intensity:.1f}")
+
+                sequential_row_num += 1
+
+            logger.info(f"[{self.name.upper()}] Successfully extracted {len(extracted_cells)} shape cells from column")
+            return extracted_cells
+
+        except Exception as e:
+            logger.error(f"[{self.name.upper()}] Error extracting cells from shape column: {str(e)}")
+            return []
+
     def save_drawing_cells(self, extracted_cells, output_dir, input_file_path=None):
         """
         Save extracted drawing cells as PNG files.
@@ -832,16 +984,16 @@ class Form1S4Agent:
 
             # Extract order name and page number from input file path
             base_name = os.path.basename(input_file_path)
-            # Extract from patterns like CO25S006375_ordertable_page1_gridlines.png
+            # Extract from patterns like CO25S006375_shape_column_page1.png
             order_name = "unknown"
             page_num = "1"
 
-            if "_ordertable_" in base_name:
-                order_name = base_name.split("_ordertable_")[0]
+            if "_shape_column_" in base_name:
+                order_name = base_name.split("_shape_column_")[0]
                 if "_page" in base_name:
                     try:
                         page_part = base_name.split("_page")[1]
-                        page_num = page_part.split("_")[0]
+                        page_num = page_part.split(".")[0]  # Remove file extension
                     except:
                         page_num = "1"
 
@@ -868,10 +1020,10 @@ class Form1S4Agent:
 
     def process_image(self, input_image_path):
         """
-        Main processing function that extracts drawing cells from the 6th column.
+        Main processing function that extracts drawing cells from shape column.
 
         Args:
-            input_image_path: Path to the input image (ordertable_gridlines.png from form1s3)
+            input_image_path: Path to the input image (shape_column_page.png from form1s4_1)
 
         Returns:
             Dictionary with processing results
@@ -895,24 +1047,61 @@ class Form1S4Agent:
             logger.info(f"[{self.name.upper()}] Loaded image: {input_image_path}")
             print(f"[DEBUG] Image loaded successfully: {image.shape}")
 
-            # Step 1: Detect green grid lines directly from the full image
-            # Skip red bounding box detection since green lines overlay the red lines
-            print(f"[DEBUG] Detecting green grid lines directly...")
+            # Step 1: For shape column images, detect green horizontal lines specifically
+            print(f"[DEBUG] Processing shape column image - detecting green horizontal grid lines...")
 
-            horizontal_positions, vertical_positions = self.detect_green_grid_lines(image)
-            print(f"[DEBUG] Raw detection: {len(horizontal_positions)} horizontal, {len(vertical_positions)} vertical")
+            # Convert to HSV for better green detection
+            hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 
-            if not horizontal_positions or not vertical_positions:
-                error_msg = "Failed to detect green grid lines"
+            # Define range for green color (same as Form1S4_1)
+            lower_green = np.array([35, 50, 50])
+            upper_green = np.array([85, 255, 255])
+
+            # Create mask for green pixels
+            green_mask = cv2.inRange(hsv, lower_green, upper_green)
+
+            # Find horizontal green lines by scanning each row
+            horizontal_positions = []
+            height, width = image.shape[:2]
+
+            for y in range(height):
+                green_pixel_count = np.sum(green_mask[y, :] > 0)
+                # If more than 40% of the row is green, it's likely a horizontal line
+                if green_pixel_count > width * 0.4:
+                    horizontal_positions.append(y)
+
+            # Group consecutive horizontal lines (lines within 10 pixels of each other)
+            horizontal_line_groups = []
+            if horizontal_positions:
+                current_group = [horizontal_positions[0]]
+
+                for i in range(1, len(horizontal_positions)):
+                    if horizontal_positions[i] - horizontal_positions[i-1] <= 10:
+                        current_group.append(horizontal_positions[i])
+                    else:
+                        if len(current_group) > 0:
+                            horizontal_line_groups.append(current_group)
+                        current_group = [horizontal_positions[i]]
+
+                # Add the last group
+                if len(current_group) > 0:
+                    horizontal_line_groups.append(current_group)
+
+            # Get representative line from each group (use middle line)
+            horizontal_lines = []
+            for group in horizontal_line_groups:
+                horizontal_lines.append(int(np.mean(group)))
+
+            horizontal_lines = sorted(horizontal_lines)
+            print(f"[DEBUG] Detected {len(horizontal_lines)} horizontal lines in shape column")
+
+            if len(horizontal_lines) < 2:
+                error_msg = "Not enough horizontal lines detected to extract cells"
                 logger.error(f"[{self.name.upper()}] {error_msg}")
                 return {"status": "error", "error": error_msg}
 
-            # Step 2: Deduplicate and sort detected line positions
-            horizontal_lines, vertical_lines = self.deduplicate_and_sort_lines(horizontal_positions, vertical_positions)
-            print(f"[DEBUG] After deduplication: {len(horizontal_lines)} horizontal, {len(vertical_lines)} vertical")
-
-            # Step 3: Extract drawing cells from the 6th column using full image coordinates
-            extracted_cells = self.extract_drawing_cells_full_image(image, horizontal_lines, vertical_lines)
+            # Step 2: Extract drawing cells directly from the shape column
+            extracted_cells = self.extract_cells_from_shape_column(image, horizontal_lines)
 
             if not extracted_cells:
                 logger.warning(f"[{self.name.upper()}] No drawing cells extracted")
@@ -930,9 +1119,9 @@ class Form1S4Agent:
                 "input_file": input_image_path,
                 "grid_structure": {
                     "horizontal_lines": len(horizontal_lines),
-                    "vertical_lines": len(vertical_lines),
+                    "vertical_lines": 0,  # Shape column has no vertical lines
                     "horizontal_positions": horizontal_lines,
-                    "vertical_positions": vertical_lines
+                    "vertical_positions": []
                 },
                 "extraction_results": {
                     "total_cells_extracted": len(extracted_cells),
@@ -948,7 +1137,7 @@ class Form1S4Agent:
                     }
                     for cell in extracted_cells
                 ],
-                "method": "opencv_direct_green_grid_extraction"
+                "method": "shape_column_horizontal_line_extraction"
             }
 
             logger.info(f"[{self.name.upper()}] Drawing cell extraction completed successfully")
@@ -967,13 +1156,13 @@ def main():
     try:
         agent = Form1S4Agent()
 
-        # Look for the output from form1s3 (ordertable_gridlines.png) in grid folder with page number
-        input_path = "../../../io/fullorder_output/table_detection/grid/CO25S006375_ordertable_page1_gridlines.png"
+        # Look for the output from form1s4_1 (shape_column_page.png) in shape_column folder with page number
+        input_path = "../../../io/fullorder_output/table_detection/shape_column/CO25S006375_shape_column_page1.png"
 
         if not os.path.exists(input_path):
             print(f"Input file not found: {input_path}")
             print(f"Current working directory: {os.getcwd()}")
-            print("Please run form1s3 first to generate the grid lines image.")
+            print("Please run form1s4_1 first to generate the shape column image.")
             return
 
         print(f"Processing file: {os.path.abspath(input_path)}")

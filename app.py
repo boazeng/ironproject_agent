@@ -1,5 +1,6 @@
 """
 Flask Web Application for IRONMAN Order Analysis System
+Updated with HTTP status codes for rib data endpoint
 """
 
 from flask import Flask, render_template, jsonify, send_file, request, abort
@@ -20,8 +21,12 @@ import fnmatch
 # from agents.llm_agents.format1_agent.form1dat1 import Form1Dat1Agent
 # Import the UseAreaTable agent for table area processing
 # from agents.llm_agents.format1_agent.use_area_table import UseAreaTableAgent
+# Import Form1dat2 agent for shape catalog integration
+from agents.llm_agents.format1_agent.form1dat2 import Form1Dat2Agent
+# Import Form1OCR3 Rib-OCR agent for mapping catalog letters to drawings
+from agents.llm_agents.format1_agent.form1ocr3_ribocr import create_form1ocr2_agent
 # Import JSON database for actual persistence
-from data.json_database import IronDrawingJSONDatabase
+# from data.json_database import IronDrawingJSONDatabase  # No longer used - using central output files directly
 
 app = Flask(__name__)
 CORS(app)
@@ -51,8 +56,7 @@ analysis_status = {
 # form1dat1_agent = Form1Dat1Agent()
 # Initialize UseAreaTable agent for table area processing
 # use_area_table_agent = UseAreaTableAgent()
-# Initialize JSON database for persistence
-json_db = IronDrawingJSONDatabase("data/orders_database.json")
+# Note: Now using central output files directly instead of separate JSON database
 
 @app.route('/')
 def index():
@@ -69,47 +73,6 @@ def status():
     """Simple status route"""
     return {"status": "ok", "message": "Server is running"}
 
-@app.route('/api/latest-analysis')
-def latest_analysis():
-    """Mock latest analysis endpoint with sample data"""
-    return {
-        "status": "ok",
-        "message": "Analysis loaded successfully",
-        "file": "CO25S006375.pdf",
-        "order_number": "CO25S006375",
-        "customer": "חברת בניין דוגמה",
-        "shapes": [
-            {
-                "row": 1,
-                "page": 1,
-                "catalog": "000",
-                "shape_image": "CO25S006375_drawing_row_1_page1.png",
-                "dimensions": {"A": "150"},
-                "description": "קו ישר"
-            },
-            {
-                "row": 2,
-                "page": 1,
-                "catalog": "104",
-                "shape_image": "CO25S006375_drawing_row_2_page1.png",
-                "dimensions": {"A": "200", "C": "100"},
-                "description": "צורת L"
-            },
-            {
-                "row": 3,
-                "page": 1,
-                "catalog": "000",
-                "shape_image": "CO25S006375_drawing_row_3_page1.png",
-                "dimensions": {"A": "300"},
-                "description": "קו ישר"
-            }
-        ],
-        "table_data": [
-            {"row": 1, "catalog": "000", "diameter": "12", "quantity": "10", "notes": "לדוגמה בלבד"},
-            {"row": 2, "catalog": "104", "diameter": "16", "quantity": "8", "notes": "נתון לבדיקה"},
-            {"row": 3, "catalog": "000", "diameter": "20", "quantity": "12", "notes": "מאושר"}
-        ]
-    }
 
 @app.route('/api/run-analysis', methods=['POST'])
 def run_analysis():
@@ -338,7 +301,19 @@ def get_latest_analysis():
             if os.path.exists(pdf_path):
                 # Convert to web-accessible path
                 data['pdf_path'] = f'/pdf/{pdf_name}'
-        
+
+        # Add shape data if not present but shape files exist
+        if 'shape_cells' not in data and 'shape_cell_paths' not in data:
+            shapes_dir = os.path.join(OUTPUT_DIR, 'table_detection', 'shapes')
+            if os.path.exists(shapes_dir):
+                shape_files = [f for f in os.listdir(shapes_dir) if f.endswith(('.png', '.jpg', '.jpeg'))]
+                if shape_files:
+                    # Sort files by name to maintain order
+                    shape_files.sort()
+                    # Create shape_cell_paths array for backward compatibility
+                    data['shape_cell_paths'] = [os.path.join(shapes_dir, f) for f in shape_files]
+                    print(f"Added {len(shape_files)} shape files to analysis data")
+
         return jsonify(data)
         
     except Exception as e:
@@ -429,6 +404,24 @@ def serve_catalog_image(catalog_number):
             return jsonify({'error': f'Catalog image not found for {catalog_number}'}), 404
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/shape_template/<shape_number>')
+def serve_shape_template(shape_number):
+    """Serve shape template HTML files from templates/shapes folder"""
+    try:
+        template_dir = os.path.join('templates', 'shapes')
+        # Format: shape_XXX.html where XXX is the shape number
+        filename = f"shape_{shape_number}.html"
+        template_path = os.path.join(template_dir, filename)
+
+        if os.path.exists(template_path):
+            with open(template_path, 'r', encoding='utf-8') as f:
+                template_content = f.read()
+            return template_content, 200, {'Content-Type': 'text/html; charset=utf-8'}
+        else:
+            return f'<div class="template-placeholder"><span>תבנית לא נמצאה עבור צורה {shape_number}</span></div>', 404
+    except Exception as e:
+        return f'<div class="template-placeholder"><span>שגיאה בטעינת התבנית: {str(e)}</span></div>', 500
 
 @app.route('/api/files')
 def list_files():
@@ -1307,19 +1300,121 @@ def get_table_ocr_data(page_number):
             'page_number': page_number
         })
 
+@app.route('/api/rib-data/<string:order_number>/<string:page_number>/<string:line_number>')
+def get_rib_data_with_order(order_number, page_number, line_number):
+    """Get rib data for a specific order line from the central output file (with order number)"""
+    try:
+        print(f"[DEBUG] Getting rib data for order {order_number}, page {page_number}, line {line_number}")
+
+        # Get data from central output file
+        output_file_path = f'io/fullorder_output/json_output/{order_number}_out.json'
+        try:
+            with open(output_file_path, 'r', encoding='utf-8') as f:
+                full_data = json.load(f)
+            section3_data = full_data.get('section_3_shape_analysis', {})
+            print(f"[DEBUG] Loaded rib data from {output_file_path}")
+        except FileNotFoundError:
+            print(f"[ERROR] Output file not found: {output_file_path}")
+            return jsonify({
+                'success': False,
+                'error': f'Output file not found for order {order_number}'
+            }), 404
+        except Exception as e:
+            print(f"[ERROR] Error loading output file: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Error loading data: {str(e)}'
+            }), 500
+
+        # Look for the specific page and line by order_line_no
+        page_key = f"page_{page_number}"
+
+        if page_key not in section3_data:
+            return jsonify({
+                'success': False,
+                'error': f'No data found for page {page_number}'
+            }), 404
+
+        page_data = section3_data[page_key]
+        order_lines = page_data.get('order_lines', {})
+
+        # Find the line by order_line_no instead of line position
+        line_data = None
+        print(f"[DEBUG] Looking for order_line_no={line_number} in page {page_number}")
+        print(f"[DEBUG] Available lines in page {page_number}: {list(order_lines.keys())}")
+
+        for line_key, line_info in order_lines.items():
+            order_line_no = line_info.get('order_line_no', '')
+            print(f"[DEBUG] Checking {line_key}: order_line_no='{order_line_no}' vs target='{line_number}'")
+            if str(order_line_no) == str(line_number):
+                line_data = line_info
+                print(f"[DEBUG] Found match in {line_key}!")
+                break
+
+        if not line_data:
+            print(f"[DEBUG] No match found for order_line_no={line_number}")
+            return jsonify({
+                'success': False,
+                'error': f'No data found for order line {line_number} on page {page_number}'
+            }), 404
+        ribs_data = line_data.get('ribs', {})
+
+        # Format rib data for template use (same format as second endpoint)
+        rib_values = {}
+        for rib_key, rib_info in ribs_data.items():
+            rib_letter = rib_info.get('rib_letter') or rib_info.get('angle_letter')
+            if rib_letter:
+                rib_values[rib_letter] = rib_info.get('value', '')
+
+        print(f"[DEBUG] Found {len(rib_values)} visible ribs for {order_number}/{page_number}/{line_number}")
+
+        return jsonify({
+            'success': True,
+            'rib_values': rib_values,
+            'ribs_data': ribs_data,
+            'shape_catalog_number': line_data.get('shape_catalog_number'),
+            'order_number': order_number,
+            'page_number': page_number,
+            'line_number': line_number
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Error in get_rib_data_with_order: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Server error: {str(e)}'
+        }), 500
+
+@app.route('/api/rib-data/<string:page_number>/<string:line_number>')
+def get_rib_data(page_number, line_number):
+    """DEPRECATED: Old API endpoint - use /api/rib-data/<order_number>/<page_number>/<line_number> instead"""
+    print(f"[DEBUG] DEPRECATED API CALL: /api/rib-data/{page_number}/{line_number} - Please update to use order number")
+    return jsonify({
+        'success': False,
+        'error': 'This API endpoint is deprecated. Please update your JavaScript to use /api/rib-data/<order_number>/<page_number>/<line_number>',
+        'deprecated': True
+    }), 410  # 410 Gone - indicates resource is permanently unavailable
+
 def save_to_database_section3(order_number, page_number, line_number, row_data):
     """
-    Save row data to Section 3 of the database using form1dat1 agent
-    Follows the database structure defined in readme_database_structure.txt
+    Save row data to Section 3 of the central output file
     """
     try:
-        # Initialize order if it doesn't exist (mock)
-        # form1dat1_agent.initialize_order(order_number)
+        # Load central output file
+        central_output_path = f'io/fullorder_output/json_output/{order_number}_out.json'
 
-        # Get current Section 3 data from database or create new structure
-        order_key = f"order_{order_number}_section3"
-        existing_order_data = json_db.get_drawing(order_key) or {}
-        current_section3 = existing_order_data.get("section_3", {})
+        if not os.path.exists(central_output_path):
+            print(f"[ERROR] Central output file not found: {central_output_path}")
+            return False
+
+        with open(central_output_path, 'r', encoding='utf-8') as f:
+            central_data = json.load(f)
+
+        # Navigate to section_3_shape_analysis
+        if 'section_3_shape_analysis' not in central_data:
+            central_data['section_3_shape_analysis'] = {}
+
+        current_section3 = central_data['section_3_shape_analysis']
 
         # Create page structure if it doesn't exist
         page_key = f"page_{page_number}"
@@ -1353,19 +1448,12 @@ def save_to_database_section3(order_number, page_number, line_number, row_data):
         # Update the number of order lines for this page
         current_section3[page_key]["number_of_order_lines"] = len(current_section3[page_key]["order_lines"])
 
-        # Save to database
-        # success = form1dat1_agent.update_section(order_number, "section_3_shape_analysis", current_section3, merge=False)
-        # Save to JSON database (we already have order_key from loading)
-        existing_order_data["section_3"] = current_section3
-        json_db.add_drawing(order_key, existing_order_data)
-        success = True
+        # Save to central output file
+        with open(central_output_path, 'w', encoding='utf-8') as f:
+            json.dump(central_data, f, ensure_ascii=False, indent=2)
 
-        if success:
-            print(f"[OK] Saved to database: Order {order_number}, Page {page_number}, Line {line_number}")
-        else:
-            print(f"[ERROR] Failed to save to database")
-
-        return success
+        print(f"[OK] Saved to central output file: Order {order_number}, Page {page_number}, Line {line_number}")
+        return True
 
     except Exception as e:
         try:
@@ -1650,6 +1738,357 @@ def get_catalog_ribs(catalog_number):
             'error': str(e)
         })
 
+@app.route('/api/catalog-data')
+def get_catalog_data():
+    """Get the entire catalog data"""
+    try:
+        catalog_file_path = os.path.join('io', 'catalog', 'catalog_format.json')
+
+        if not os.path.exists(catalog_file_path):
+            return jsonify({
+                'success': False,
+                'error': 'Catalog file not found'
+            })
+
+        # Load catalog data
+        with open(catalog_file_path, 'r', encoding='utf-8') as f:
+            catalog_data = json.load(f)
+
+        return jsonify({
+            'success': True,
+            'data': catalog_data
+        })
+
+    except Exception as e:
+        print(f"[ERROR] Failed to load catalog data: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/shape-template/<string:shape_number>')
+def get_shape_template(shape_number):
+    """Get HTML template for a specific shape number"""
+    try:
+        # Path to shape template file
+        template_file_path = os.path.join('templates', 'shapes', f'shape_{shape_number}.html')
+
+        if not os.path.exists(template_file_path):
+            return jsonify({
+                'success': False,
+                'error': f'Template for shape {shape_number} not found'
+            })
+
+        # Read template content
+        with open(template_file_path, 'r', encoding='utf-8') as f:
+            template_content = f.read()
+
+        # Get file modification time for cache busting
+        file_mtime = os.path.getmtime(template_file_path)
+        cache_buster = str(int(file_mtime))
+
+        print(f"[DEBUG] Loading template for shape {shape_number}, file mtime: {cache_buster}")
+
+        response = jsonify({
+            'success': True,
+            'shape_number': shape_number,
+            'template': template_content,
+            'cache_buster': cache_buster
+        })
+
+        # Add no-cache headers to prevent browser caching
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+
+        return response
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@app.route('/api/update-catalog-number', methods=['POST'])
+def update_catalog_number():
+    """Update catalog number and integrate shape data using Form1dat2 agent"""
+    try:
+        data = request.json
+        order_number = data.get('orderNumber')
+        page_number = data.get('pageNumber')
+        line_number = data.get('lineNumber')
+        catalog_number = data.get('catalogNumber')
+
+        print(f"[DEBUG] Updating catalog number: Order {order_number}, Page {page_number}, Line {line_number}, Catalog {catalog_number}")
+
+        if not all([order_number, page_number, line_number, catalog_number]):
+            return jsonify({
+                'success': False,
+                'error': 'Missing required parameters: orderNumber, pageNumber, lineNumber, catalogNumber'
+            })
+
+        # Initialize Form1dat2 agent
+        form1dat2_agent = Form1Dat2Agent()
+
+        # Update the order line with new catalog number and integrate catalog data
+        result = form1dat2_agent.update_shape_in_order(
+            order_number=order_number,
+            page_number=page_number,
+            line_number=line_number,
+            new_shape_number=catalog_number
+        )
+
+        if result['status'] == 'success':
+            print(f"[DEBUG] Form1dat2 agent successfully updated: {result}")
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'updated_fields': result.get('updated_fields', []),
+                'catalog_data': {
+                    'catalog_number': catalog_number,
+                    'fields_updated': result.get('updated_fields', [])
+                }
+            })
+        else:
+            print(f"[DEBUG] Form1dat2 agent failed: {result}")
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Unknown error from Form1dat2 agent')
+            })
+
+    except Exception as e:
+        error_msg = str(e)
+        print(f"[DEBUG] Error in update_catalog_number: {error_msg}")
+        return jsonify({
+            'success': False,
+            'error': error_msg
+        })
+
+@app.route('/api/run-shape-identification', methods=['POST'])
+def run_shape_identification():
+    """Run Form1OCR3 Rib-OCR agent to map catalog letters to order drawing dimensions"""
+    try:
+        # Get request data
+        data = request.get_json() or {}
+        row_id = data.get('row_id')  # format: shape-row-{page}-{line}
+
+        if not row_id:
+            return jsonify({
+                'success': False,
+                'error': 'Missing row_id parameter'
+            })
+
+        # Parse row_id to extract page and line numbers
+        try:
+            parts = row_id.split('-')
+            if len(parts) >= 4 and parts[0] == 'shape' and parts[1] == 'row':
+                page_number = int(parts[2])
+                line_number = int(parts[3])
+            else:
+                raise ValueError("Invalid row_id format")
+        except (ValueError, IndexError) as e:
+            return jsonify({
+                'success': False,
+                'error': f'Invalid row_id format. Expected: shape-row-{{page}}-{{line}}, got: {row_id}'
+            })
+
+        print(f"[INFO] Running shape identification for row: {row_id} (page {page_number}, line {line_number})")
+
+        # Find the current order data
+        analysis_files = glob.glob(os.path.join(OUTPUT_DIR, '*_analysis.json'))
+        if not analysis_files:
+            return jsonify({
+                'success': False,
+                'error': 'No analysis files found'
+            })
+
+        # Get the most recent analysis file
+        analysis_files.sort(key=os.path.getmtime, reverse=True)
+        analysis_file = analysis_files[0]
+
+        with open(analysis_file, 'r', encoding='utf-8') as f:
+            analysis_data = json.load(f)
+
+        # Extract order number from filename
+        order_number = os.path.basename(analysis_file).replace('_analysis.json', '')
+
+        # Get order data from the central output file
+        central_output_path = f'io/fullorder_output/json_output/{order_number}_out.json'
+        if not os.path.exists(central_output_path):
+            return jsonify({
+                'success': False,
+                'error': f'Central output file not found: {central_output_path}'
+            })
+
+        with open(central_output_path, 'r', encoding='utf-8') as f:
+            central_data = json.load(f)
+
+        # Navigate to section_3_shape_analysis
+        if 'section_3_shape_analysis' not in central_data:
+            return jsonify({
+                'success': False,
+                'error': 'Section 3 shape analysis not found in central output file'
+            })
+
+        section3_data = central_data['section_3_shape_analysis']
+
+        # Find the line data
+        page_key = f'page_{page_number}'
+        line_key = f'line_{line_number}'
+
+        if page_key not in section3_data:
+            return jsonify({
+                'success': False,
+                'error': f'Page {page_number} not found in central output file'
+            })
+
+        page_data = section3_data[page_key]
+        if 'order_lines' not in page_data or line_key not in page_data['order_lines']:
+            return jsonify({
+                'success': False,
+                'error': f'Line {line_number} not found in page {page_number} of central output file'
+            })
+
+        line_data = page_data['order_lines'][line_key]
+
+        if not line_data:
+            return jsonify({
+                'success': False,
+                'error': f'Line {line_number} not found on page {page_number}'
+            })
+        catalog_number = line_data.get('shape_catalog_number', '')
+
+        if not catalog_number:
+            return jsonify({
+                'success': False,
+                'error': f'No catalog number found for line {line_number} on page {page_number}'
+            })
+
+        # Prepare paths for catalog and order images
+        catalog_image_path = os.path.join('io', 'catalog', f'shape {catalog_number}.png')
+        order_image_path = os.path.join('io', 'fullorder_output', 'table_detection', 'shapes',
+                                      f'{order_number}_drawing_row_{line_number}_page{page_number}.png')
+
+        # Check if images exist
+        if not os.path.exists(catalog_image_path):
+            return jsonify({
+                'success': False,
+                'error': f'Catalog image not found: {catalog_image_path}'
+            })
+
+        if not os.path.exists(order_image_path):
+            return jsonify({
+                'success': False,
+                'error': f'Order image not found: {order_image_path}'
+            })
+
+        # Prepare letter list from existing rib data - only include visible items
+        ribs_data = line_data.get('ribs', {})
+        letter_list = []
+
+        for rib_key, rib_info in ribs_data.items():
+            # Only process items that are visible
+            if isinstance(rib_info, dict) and rib_info.get('visible', False) == True:
+                letter = rib_info.get('rib_letter') or rib_info.get('angle_letter', '')
+                if letter:
+                    rib_type = 'angle' if rib_info.get('angle_letter') else 'rib'
+                    entry = {
+                        'letter': letter,
+                        'type': rib_type
+                    }
+
+                    # Check for 90-degree angle
+                    if rib_type == 'angle':
+                        is_90 = rib_info.get('is_90_degree', False) or rib_info.get('value') == '90'
+                        entry['is_90'] = is_90
+
+                    letter_list.append(entry)
+
+        if not letter_list:
+            return jsonify({
+                'success': False,
+                'error': 'No rib/angle letters found for this line'
+            })
+
+        print(f"[INFO] Letter list for identification: {letter_list}")
+
+        # Initialize and run Form1OCR3 agent
+        try:
+            agent = create_form1ocr2_agent()
+            result = agent.map_catalog_to_order(
+                catalog_image_path=catalog_image_path,
+                order_image_path=order_image_path,
+                letter_list=letter_list,
+                shape_number=catalog_number,
+                line_order=line_number
+            )
+
+            print(f"[INFO] Form1OCR3 agent result: {result.get('summary', {})}")
+
+            # Save the mapping results back to the database
+            if result.get('summary', {}).get('success', False):
+                mappings = result.get('mappings', [])
+
+                # Update rib values in the database
+                updated_ribs = {}
+                for mapping in mappings:
+                    letter = mapping.get('letter')
+                    value = mapping.get('number')
+                    confidence = mapping.get('confidence', 0.0)
+
+                    if letter and value is not None:
+                        # Find the corresponding rib entry
+                        for rib_key, rib_info in ribs_data.items():
+                            if isinstance(rib_info, dict):
+                                rib_letter = rib_info.get('rib_letter') or rib_info.get('angle_letter', '')
+                                if rib_letter == letter:
+                                    # Update the value and add confidence
+                                    updated_rib_info = rib_info.copy()
+                                    updated_rib_info['value'] = str(value)
+                                    updated_rib_info['form1ocr3_confidence'] = confidence
+                                    updated_rib_info['form1ocr3_timestamp'] = datetime.now().isoformat()
+                                    updated_ribs[rib_key] = updated_rib_info
+                                    break
+
+                # Update the central output file with new rib values
+                if updated_ribs:
+                    for rib_key, rib_info in updated_ribs.items():
+                        line_data['ribs'][rib_key] = rib_info
+
+                    # Save updated data back to the central output file
+                    with open(central_output_path, 'w', encoding='utf-8') as f:
+                        json.dump(central_data, f, ensure_ascii=False, indent=2)
+                    print(f"[INFO] Updated {len(updated_ribs)} rib values in central output file")
+
+                return jsonify({
+                    'success': True,
+                    'row_id': row_id,
+                    'mappings_found': len(mappings),
+                    'values_updated': len(updated_ribs),
+                    'mappings': mappings,
+                    'summary': result.get('summary', {})
+                })
+            else:
+                return jsonify({
+                    'success': False,
+                    'error': f'Form1OCR3 agent failed: {result.get("summary", {}).get("notes", "Unknown error")}',
+                    'agent_result': result
+                })
+
+        except Exception as e:
+            print(f"[ERROR] Form1OCR3 agent failed: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'Form1OCR3 agent error: {str(e)}'
+            })
+
+    except Exception as e:
+        print(f"[ERROR] Shape identification failed: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
 if __name__ == "__main__":
     # Create necessary directories
     os.makedirs('templates', exist_ok=True)
@@ -1663,4 +2102,4 @@ if __name__ == "__main__":
     print("[DEBUG] UPDATED CODE LOADED - Version with debug logging")
 
     # Run the Flask app with template auto-reload enabled
-    app.run(debug=True, host='0.0.0.0', port=5002, use_reloader=True)
+    app.run(debug=True, host='0.0.0.0', port=5002, use_reloader=False, threaded=True)

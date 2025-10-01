@@ -17,7 +17,7 @@ from datetime import datetime
 from pathlib import Path
 
 # Import agents
-from agents.llm_agents.output_cleaner import OutputCleanerAgent
+from output_cleaner import OutputCleanerAgent
 from agents.llm_agents.format1_agent import OrderFormat1MainAgent
 from agents.llm_agents.format1_agent.form1s2 import Form1S2Agent
 from agents.llm_agents.format1_agent.form1s3 import Form1S3Agent
@@ -519,7 +519,7 @@ class TableDetectionPipeline:
             return False
 
     def process_with_form1s4(self):
-        """Step 5: Process ordertable_gridlines.png with Form1S4 agent for drawing cell extraction"""
+        """Step 5: Process shape_column files with Form1S4 agent for drawing cell extraction"""
         self.print_section("STEP 5: DRAWING CELL EXTRACTION (FORM1S4)")
 
         try:
@@ -527,80 +527,96 @@ class TableDetectionPipeline:
             form1s4_agent = Form1S4Agent()
             print(f"[FORM1S4] Agent initialized: {form1s4_agent.name}")
 
-            # Look for ordertable_gridlines.png from form1s3 output in grid folder with page number
-            gridlines_files = glob.glob(f"{self.output_dir}/table_detection/grid/*_ordertable_page1_gridlines.png")
+            # Look for shape_column files from form1s4_1 output in shape_column folder
+            shape_column_files = glob.glob(f"{self.output_dir}/table_detection/shape_column/*_shape_column_page*.png")
 
-            if not gridlines_files:
-                print(f"[FORM1S4] ordertable_gridlines.png not found at {self.output_dir}/table_detection/grid/*_ordertable_page1_gridlines.png")
+            if not shape_column_files:
+                print(f"[FORM1S4] shape_column files not found at {self.output_dir}/table_detection/shape_column/*_shape_column_page*.png")
                 self.results["form1s4"] = {"status": "no_files"}
                 return True
 
-            gridlines_path = gridlines_files[0]  # Use first matching file
+            print(f"[FORM1S4] Found {len(shape_column_files)} shape_column files, processing drawing cell extraction")
 
-            print(f"[FORM1S4] Found ordertable_gridlines.png, processing drawing cell extraction")
+            total_successful = 0
+            all_saved_files = []
 
-            try:
-                result = form1s4_agent.process_image(gridlines_path)
+            # Process all shape_column files
+            for shape_column_path in shape_column_files:
+                print(f"[FORM1S4] Processing: {os.path.basename(shape_column_path)}")
 
-                if result["status"] == "success":
-                    extraction_results = result.get("extraction_results", {})
-                    total_cells = extraction_results.get("total_cells_extracted", 0)
+                try:
+                    result = form1s4_agent.process_image(shape_column_path)
 
-                    print(f"[FORM1S4] [SUCCESS] Drawing cell extraction completed")
-                    print(f"[FORM1S4]   Cells extracted: {total_cells}")
-                    print(f"[FORM1S4]   Output directory: {extraction_results.get('output_directory', 'N/A')}")
+                    if result["status"] == "success":
+                        extraction_results = result.get("extraction_results", {})
+                        total_cells = extraction_results.get("total_cells_extracted", 0)
 
-                    if extraction_results.get("saved_files"):
-                        print(f"[FORM1S4]   Files saved:")
-                        for file_path in extraction_results["saved_files"]:
-                            file_name = os.path.basename(file_path)
-                            print(f"[FORM1S4]     - {file_name}")
+                        if total_cells > 0:
+                            total_successful += 1
+                            if extraction_results.get("saved_files"):
+                                all_saved_files.extend(extraction_results["saved_files"])
 
-                    # Store results
-                    self.results["form1s4"] = {
-                        "status": "completed",
-                        "total_files": 1,
-                        "successful_files": 1,
-                        "failed_files": 0,
-                        "result": result
-                    }
-                    return True
-                else:
-                    error_msg = result.get("error", "Unknown error")
-                    print(f"[FORM1S4] [ERROR] {error_msg}")
+                        print(f"[FORM1S4] [SUCCESS] {os.path.basename(shape_column_path)} - {total_cells} cells extracted")
+                    else:
+                        error_msg = result.get("error", "Unknown error")
+                        print(f"[FORM1S4] [ERROR] Failed to process {os.path.basename(shape_column_path)}: {error_msg}")
 
-                    self.results["form1s4"] = {
-                        "status": "completed_with_errors",
-                        "total_files": 1,
-                        "successful_files": 0,
-                        "failed_files": 1,
-                        "error": error_msg
-                    }
-                    self.results["errors"].append(f"Form1S4 error: {error_msg}")
-                    return False
+                except Exception as e:
+                    print(f"[FORM1S4] [ERROR] Exception processing {os.path.basename(shape_column_path)}: {str(e)}")
 
-            except Exception as e:
-                error_msg = f"Failed to process ordertable_gridlines.png: {str(e)}"
+            # Final summary
+            if total_successful > 0:
+                print(f"[FORM1S4] [SUCCESS] Drawing cell extraction completed")
+                print(f"[FORM1S4]   Files processed: {total_successful}/{len(shape_column_files)}")
+                print(f"[FORM1S4]   Total cells extracted: {len(all_saved_files)}")
+
+                if all_saved_files:
+                    print(f"[FORM1S4]   Sample files saved:")
+                    for file_path in all_saved_files[:5]:  # Show first 5 files
+                        file_name = os.path.basename(file_path)
+                        print(f"[FORM1S4]     - {file_name}")
+                    if len(all_saved_files) > 5:
+                        print(f"[FORM1S4]     ... and {len(all_saved_files) - 5} more files")
+
+                # Store results
+                self.results["form1s4"] = {
+                    "status": "completed",
+                    "total_files": len(shape_column_files),
+                    "successful_files": total_successful,
+                    "failed_files": len(shape_column_files) - total_successful,
+                    "total_cells_extracted": len(all_saved_files)
+                }
+                return True
+            else:
+                error_msg = "No files processed successfully"
                 print(f"[FORM1S4] [ERROR] {error_msg}")
 
                 self.results["form1s4"] = {
-                    "status": "error",
-                    "total_files": 1,
+                    "status": "completed_with_errors",
+                    "total_files": len(shape_column_files),
                     "successful_files": 0,
-                    "failed_files": 1,
+                    "failed_files": len(shape_column_files),
                     "error": error_msg
                 }
-                self.results["errors"].append(error_msg)
+                self.results["errors"].append(f"Form1S4 error: {error_msg}")
                 return False
 
         except Exception as e:
-            error_msg = f"Failed during Form1S4 processing: {str(e)}"
+            error_msg = f"Failed to process shape_column files: {str(e)}"
             print(f"[FORM1S4] [ERROR] {error_msg}")
+
+            self.results["form1s4"] = {
+                "status": "error",
+                "total_files": 1,
+                "successful_files": 0,
+                "failed_files": 1,
+                "error": error_msg
+            }
             self.results["errors"].append(error_msg)
             return False
 
     def process_with_form1s4_1(self):
-        """Step 5.1: Process ordertable_gridlines.png with Form1S4.1 agent for full drawing column extraction"""
+        """Step 5.1: Process table_bodyonly files with Form1S4.1 agent for full drawing column extraction"""
         self.print_section("STEP 5.1: FULL DRAWING COLUMN EXTRACTION (FORM1S4.1)")
 
         try:
@@ -608,7 +624,7 @@ class TableDetectionPipeline:
             form1s4_1_agent = Form1S4_1Agent()
             print(f"[FORM1S4.1] Agent initialized: {form1s4_1_agent.name}")
 
-            # Use batch processing to handle all gridlines files
+            # Use batch processing to handle all table_bodyonly files
             results = form1s4_1_agent.process_batch()
 
             if results:
@@ -644,7 +660,7 @@ class TableDetectionPipeline:
                     self.results["errors"].append(f"Form1S4.1 error: {error_msg}")
                     return False
             else:
-                print(f"[FORM1S4.1] No gridlines files found for processing")
+                print(f"[FORM1S4.1] No table_bodyonly files found for processing")
                 self.results["form1s4_1"] = {"status": "no_files"}
                 return True
 
@@ -819,13 +835,13 @@ class TableDetectionPipeline:
             print(f"  -> Running Form1S3.3 for page {page_number}")
             form1s3_3_success = self.process_page_with_form1s3_3(page_number)
 
-            # Step 6: Form1S4 - Drawing cell extraction
-            print(f"  -> Running Form1S4 for page {page_number}")
-            form1s4_success = self.process_page_with_form1s4(page_number)
-
-            # Step 7: Form1S4.1 - Full drawing column extraction
+            # Step 6: Form1S4.1 - Full drawing column extraction (must run first)
             print(f"  -> Running Form1S4.1 for page {page_number}")
             form1s4_1_success = self.process_page_with_form1s4_1(page_number)
+
+            # Step 7: Form1S4 - Drawing cell extraction from shape columns
+            print(f"  -> Running Form1S4 for page {page_number}")
+            form1s4_success = self.process_page_with_form1s4(page_number)
 
             # Step 8: Form1S5 - Order title extraction
             print(f"  -> Running Form1S5 for page {page_number}")
@@ -913,17 +929,18 @@ class TableDetectionPipeline:
             return False
 
     def process_page_with_form1s4(self, page_number):
-        """Process single page with Form1S4 agent"""
+        """Process single page with Form1S4 agent using shape column files"""
         try:
             form1s4_agent = Form1S4Agent()
-            # Look for gridlines file for this page
-            gridlines_pattern = f"{self.output_dir}/table_detection/grid/*_page{page_number}_gridlines.png"
-            gridlines_files = glob.glob(gridlines_pattern)
+            # Look for shape_column file for this page (created by Form1S4_1)
+            shape_column_pattern = f"{self.output_dir}/table_detection/shape_column/*_shape_column_page{page_number}.png"
+            shape_column_files = glob.glob(shape_column_pattern)
 
-            if not gridlines_files:
+            if not shape_column_files:
+                print(f"[FORM1S4] No shape column file found for page {page_number}")
                 return False
 
-            result = form1s4_agent.process_image(gridlines_files[0])
+            result = form1s4_agent.process_image(shape_column_files[0])
             return result.get("status") == "success"
         except Exception as e:
             self.results["errors"].append(f"Form1S4 page {page_number} error: {str(e)}")

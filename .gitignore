@@ -39,4 +39,4 @@ htmlcov/
 # Distribution / packaging
 dist/
 build/
-*.egg-info/
+*.egg-info/.env

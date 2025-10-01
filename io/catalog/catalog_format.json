@@ -17,7 +17,8 @@
         {
           "rib_number": 1,
           "rib_type": "regular",
-          "rib_letter": "A"
+          "rib_letter": "A",
+          "visible": true
         }
       ]
     },
@@ -31,17 +32,20 @@
         {
           "rib_number": 1,
           "rib_type": "regular",
-          "rib_letter": "A"
+          "rib_letter": "A",
+          "visible": true
         },
         {
           "angle": "1-2",
           "angle type": "90",
-          "angle_letter": "B"
+          "angle_letter": "B",
+          "visible": false
         },        
         {
           "rib_number": 3,
           "rib_type": "regular",
-          "rib_letter": "C"
+          "rib_letter": "C",
+          "visible": true
         }
       ]
     },
@@ -55,27 +59,32 @@
         {
           "rib_number": 1,
           "rib_type": "regular",
-          "rib_letter": "A"
+          "rib_letter": "A",
+          "visible": true
         },
         {
           "angle": "1-2",
           "angle_type": "90",
-          "angle_letter": "B"
+          "angle_letter": "B",
+          "visible": false
         },
         {
           "rib_number": 2,
           "rib_type": "regular",
-          "rib_letter": "C"
+          "rib_letter": "C",
+          "visible": true
         },
         {
           "angle": "2-3",
           "angle_type": "90",
-          "angle_letter": "D"
+          "angle_letter": "D",
+          "visible": false
         },
         {
           "rib_number": 3,
           "rib_type": "regular",
-          "rib_letter": "E"
+          "rib_letter": "E",
+          "visible": true
         }
       ]
     },
@@ -89,27 +98,32 @@
         {
           "rib_number": 1,
           "rib_type": "regular",
-          "rib_letter": "A"
+          "rib_letter": "A",
+          "visible": true
         },
         {
           "angle": "1-2",
           "angle_type": "90",
-          "angle_letter": "D"
+          "angle_letter": "D",
+          "visible": false
         },
         {
           "rib_number": 2,
           "rib_type": "regular",
-          "rib_letter": "B"
+          "rib_letter": "B",
+          "visible": true
         },
         {
           "angle": "2-3",
           "angle_type": "90",
-          "angle_letter": "E"
+          "angle_letter": "E",
+          "visible": false
         },
         {
           "rib_number": 3,
           "rib_type": "regular",
-          "rib_letter": "C"
+          "rib_letter": "C",
+          "visible": true
         }
       ]
     },
@@ -123,27 +137,32 @@
         {
           "rib_number": 1,
           "rib_type": "regular",
-          "rib_letter": "A"
+          "rib_letter": "A",
+          "visible": true
         },
         {
           "angle": "1-2",
           "angle_type": "90",
-          "angle_letter": "B"
+          "angle_letter": "B",
+          "visible": false
         },
         {
           "rib_number": 2,
           "rib_type": "regular",
-          "rib_letter": "C"
+          "rib_letter": "C",
+          "visible": true
         },
         {
           "angle": "2-3",
           "angle_type": "90",
-          "angle_letter": "D"
+          "angle_letter": "D",
+          "visible": false
         },
         {
           "rib_number": 3,
           "rib_type": "regular",
-          "rib_letter": "E"
+          "rib_letter": "E",
+          "visible": true
         }
       ]
     }

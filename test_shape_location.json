@@ -1,0 +1,46 @@
+{
+  "shapes": {
+    "shape_210": {
+      "shape_number": "210",
+      "image_dimensions": {
+        "width": 216,
+        "height": 198
+      },
+      "reference_point": {
+        "x": 0,
+        "y": 198,
+        "description": "Lower-left corner of image"
+      },
+      "fields": {
+        "Input Field": {
+          "original_name": "Input Field",
+          "x": 190.0,
+          "y": 72.0,
+          "distance_from_reference": {
+            "x": 190.0,
+            "y": 72.0
+          }
+        },
+        "Input Field_2": {
+          "original_name": "Input Field",
+          "x": 108.0,
+          "y": 35.0,
+          "distance_from_reference": {
+            "x": 108.0,
+            "y": 35.0
+          }
+        },
+        "Input Field_3": {
+          "original_name": "Input Field",
+          "x": 32.0,
+          "y": 77.0,
+          "distance_from_reference": {
+            "x": 32.0,
+            "y": 77.0
+          }
+        }
+      },
+      "timestamp": "2025-09-27T18:28:15.684608"
+    }
+  }
+}

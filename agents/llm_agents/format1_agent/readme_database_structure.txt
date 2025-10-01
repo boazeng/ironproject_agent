@@ -66,7 +66,8 @@ Structure:
         "line_1": {
           "line_number": integer,       // Line number on page
           "order_line_no": "string",    // Order line identifier
-          "shape_number": "string",     // Shape identifier
+          "shape_description": "string", // Shape description/identifier
+          "shape_catalog_number": "string", // Catalog number for the shape
           "number_of_ribs": integer,    // Total number of ribs in shape
           "diameter": "string",         // Shape diameter
           "number_of_units": integer,   // Number of units for this shape

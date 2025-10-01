@@ -13,6 +13,7 @@ from tkinter import ttk, filedialog, messagebox
 from PIL import Image, ImageTk, ImageDraw
 import json
 import os
+from datetime import datetime
 from shape_template_generator import ShapeTemplateGenerator
 
 class ShapePositioningTool:
@@ -56,19 +57,19 @@ class ShapePositioningTool:
         self.area_rect_id = None
         self.defined_areas = {}
 
+        # Display dimension overlay (300px width as used in web templates)
+        self.show_display_overlay = False
+        self.display_overlay_rect_id = None
+        self.web_display_width = 300  # Fixed width from web templates
+        self.web_display_height = None  # Calculated based on aspect ratio
+
         # Absolute positioning system
         self.reference_point = None  # (x, y) coordinates of the absolute reference point
         self.reference_point_id = None  # Canvas ID of the reference point marker
         self.set_reference_mode = False  # Flag for setting reference point mode
         self.show_distances = True  # Show distance measurements
 
-        # Shape configurations
-        self.shape_configs = {
-            '000': {'name': 'קו ישר', 'fields': ['A']},
-            '104': {'name': 'צורת L', 'fields': ['A', 'C']},
-            '107': {'name': 'צורת U', 'fields': ['A', 'C', 'E']},
-            '218': {'name': 'צורה 218', 'fields': ['A', 'B', 'C']}
-        }
+        # Shape configurations - removed hardcoded data, tool is now completely flexible
 
         # Read shape from user configuration file
         self.current_shape = self.get_user_chosen_shape()
@@ -147,10 +148,9 @@ class ShapePositioningTool:
         # Shape selection
         ttk.Label(left_panel, text="Shape:").pack(anchor=tk.W, pady=(0, 5))
         self.shape_var = tk.StringVar(value=self.current_shape)
-        shape_combo = ttk.Combobox(left_panel, textvariable=self.shape_var,
-                                  values=list(self.shape_configs.keys()), state="readonly")
-        shape_combo.pack(fill=tk.X, pady=(0, 10))
-        shape_combo.bind('<<ComboboxSelected>>', self.on_shape_changed)
+        shape_entry = ttk.Entry(left_panel, textvariable=self.shape_var)
+        shape_entry.pack(fill=tk.X, pady=(0, 10))
+        shape_entry.bind('<KeyRelease>', self.on_shape_changed)
 
         # Image controls
         ttk.Label(left_panel, text="Image:").pack(anchor=tk.W, pady=(0, 5))
@@ -167,7 +167,8 @@ class ShapePositioningTool:
         ttk.Label(left_panel, text="Image Editing:").pack(anchor=tk.W, pady=(0, 5))
         self.eraser_button = ttk.Button(left_panel, text="Enable Eraser", command=self.toggle_eraser)
         self.eraser_button.pack(fill=tk.X, pady=(0, 5))
-        ttk.Button(left_panel, text="Save Edited Image", command=self.save_edited_image).pack(fill=tk.X, pady=(0, 10))
+        ttk.Button(left_panel, text="Save Edited Image", command=self.save_edited_image).pack(fill=tk.X, pady=(0, 5))
+        ttk.Button(left_panel, text="Save with Web Display Dimensions", command=self.save_with_display_dimensions).pack(fill=tk.X, pady=(0, 10))
 
         # Area definition tool
         ttk.Label(left_panel, text="Area Definition:").pack(anchor=tk.W, pady=(0, 5))
@@ -204,10 +205,20 @@ class ShapePositioningTool:
 
         # Distance display toggle
         distance_frame = ttk.Frame(left_panel)
-        distance_frame.pack(fill=tk.X, pady=(0, 10))
+        distance_frame.pack(fill=tk.X, pady=(0, 5))
         self.show_distances_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(distance_frame, text="Show Distances", variable=self.show_distances_var,
                        command=self.toggle_distance_display).pack(side=tk.LEFT)
+
+        # Display dimension overlay toggle
+        display_overlay_frame = ttk.Frame(left_panel)
+        display_overlay_frame.pack(fill=tk.X, pady=(0, 10))
+        self.show_display_overlay_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(display_overlay_frame, text="Show Web Display Dimensions (300px)",
+                       variable=self.show_display_overlay_var,
+                       command=self.toggle_display_overlay).pack(anchor=tk.W)
+        ttk.Label(left_panel, text="Blue overlay shows exact web display size",
+                 font=("Arial", 8), foreground="blue").pack(anchor=tk.W, pady=(0, 5))
 
         # Current elements list
         ttk.Label(left_panel, text="Elements:").pack(anchor=tk.W, pady=(0, 5))
@@ -238,6 +249,13 @@ class ShapePositioningTool:
         self.text_entry.pack(fill=tk.X, pady=(0, 5))
         self.text_var.trace('w', self.on_text_changed)
 
+        # Name property (for input field names)
+        ttk.Label(left_panel, text="Field Name:").pack(anchor=tk.W)
+        self.field_name_var = tk.StringVar()
+        self.field_name_entry = ttk.Entry(left_panel, textvariable=self.field_name_var)
+        self.field_name_entry.pack(fill=tk.X, pady=(0, 5))
+        self.field_name_var.trace('w', self.on_field_name_changed)
+
         # Font size property
         ttk.Label(left_panel, text="Font Size:").pack(anchor=tk.W)
         self.font_size_var = tk.StringVar(value=str(self.default_font_size))
@@ -266,13 +284,50 @@ class ShapePositioningTool:
         ttk.Button(left_panel, text="Generate HTML", command=self.generate_html).pack(fill=tk.X, pady=(0, 5))
         ttk.Button(left_panel, text="Export as Popup Template", command=self.export_popup_template).pack(fill=tk.X, pady=(0, 10))
 
-        # Right panel - Canvas
-        right_panel = ttk.Frame(main_frame)
-        right_panel.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True)
+        # Middle panel - Canvas
+        middle_panel = ttk.Frame(main_frame)
+        middle_panel.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
 
         # Canvas with scrollbars
-        canvas_frame = ttk.Frame(right_panel)
+        canvas_frame = ttk.Frame(middle_panel)
         canvas_frame.pack(fill=tk.BOTH, expand=True)
+
+        # Right panel - Web Display Preview
+        right_panel = ttk.Frame(main_frame, width=320)
+        right_panel.pack(side=tk.RIGHT, fill=tk.Y)
+        right_panel.pack_propagate(False)
+
+        # Web preview title
+        ttk.Label(right_panel, text="Web Display Preview", font=("Arial", 12, "bold")).pack(anchor=tk.W, pady=(0, 10))
+
+        # Web preview canvas
+        self.web_preview_frame = ttk.Frame(right_panel, relief=tk.SUNKEN, borderwidth=2)
+        self.web_preview_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+
+        self.web_canvas = tk.Canvas(self.web_preview_frame, bg='#f8fafc', width=300, height=400)
+        self.web_canvas.pack(padx=10, pady=10)
+
+        # Web canvas event bindings for interaction
+        self.web_canvas.bind("<Button-1>", self.on_web_canvas_click)
+        self.web_canvas.bind("<B1-Motion>", self.on_web_canvas_drag)
+        self.web_canvas.bind("<ButtonRelease-1>", self.on_web_canvas_release)
+
+        # Web canvas interaction state
+        self.web_selected_element = None
+        self.web_drag_data = {"x": 0, "y": 0}
+        self.web_field_items = {}  # Maps element index to canvas item IDs
+
+        # Web preview controls
+        web_controls_frame = ttk.Frame(right_panel)
+        web_controls_frame.pack(fill=tk.X, pady=(0, 10))
+
+        ttk.Button(web_controls_frame, text="Refresh Preview", command=self.update_web_preview).pack(fill=tk.X, pady=(0, 5))
+
+        # Show web display toggle
+        self.show_web_preview_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(web_controls_frame, text="Auto-update preview",
+                       variable=self.show_web_preview_var,
+                       command=self.toggle_web_preview).pack(anchor=tk.W)
 
         self.canvas = tk.Canvas(canvas_frame, bg='white', scrollregion=(0, 0, 800, 600))
 
@@ -343,6 +398,10 @@ class ShapePositioningTool:
 
             self.canvas_image_id = self.canvas.create_image(center_x, center_y, anchor=tk.CENTER, image=self.image_display)
 
+            # Update display overlay if enabled
+            if self.show_display_overlay:
+                self.root.after(100, self.update_display_overlay)  # Delay to ensure image is rendered
+
             # Update canvas scroll region
             bbox = self.canvas.bbox("all")
             if bbox:
@@ -351,6 +410,10 @@ class ShapePositioningTool:
             # Clear elements
             self.elements = []
             self.update_elements_list()
+
+            # Update web preview
+            if hasattr(self, 'web_canvas'):
+                self.update_web_preview()
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load image: {str(e)}")
@@ -376,6 +439,10 @@ class ShapePositioningTool:
 
             # Move image to center
             self.canvas.coords(self.canvas_image_id, center_x, center_y)
+
+            # Update display overlay if enabled
+            if self.show_display_overlay:
+                self.root.after(100, self.update_display_overlay)
 
             # Update scroll region
             bbox = self.canvas.bbox("all")
@@ -456,25 +523,19 @@ class ShapePositioningTool:
             messagebox.showwarning("Warning", "Please load an image first")
             return
 
-        # Get shape config for default labels
-        config = self.shape_configs.get(self.current_shape, {})
-        fields = config.get('fields', ['A'])
-
-        # Use next available field letter
-        existing_labels = [e['text'] for e in self.elements if e['type'] == 'label']
-        for field in fields:
-            if field not in existing_labels:
-                text = field
-                break
-        else:
-            text = f"Label{len(self.elements)+1}"
+        # Ask user for label text
+        from tkinter import simpledialog
+        text = simpledialog.askstring("Add Label", "Enter label text:", initialvalue="A")
+        if not text:
+            return  # User cancelled
 
         element = {
             'type': 'label',
             'text': text,
             'x': 100,
             'y': 100,
-            'canvas_id': None
+            'canvas_id': None,
+            'field_name': text  # Default field name to text for labels
         }
 
         self.elements.append(element)
@@ -495,7 +556,8 @@ class ShapePositioningTool:
             'text': 'Input Field',
             'x': 150,
             'y': 150,
-            'canvas_id': None
+            'canvas_id': None,
+            'field_name': ''
         }
 
         self.elements.append(element)
@@ -520,9 +582,9 @@ class ShapePositioningTool:
                 fill=font_color, anchor=tk.CENTER, tags="draggable"
             )
         elif element['type'] == 'input':
-            # Draw input as rectangle with text
+            # Draw input as rectangle with text - smaller black frame with white interior
             element['canvas_id'] = self.canvas.create_rectangle(
-                x-40, y-15, x+40, y+15, fill="lightblue", outline="blue",
+                x-30, y-10, x+30, y+10, fill="white", outline="black", width=2,
                 tags="draggable"
             )
             # Add text inside rectangle
@@ -537,6 +599,9 @@ class ShapePositioningTool:
         self.elements_listbox.delete(0, tk.END)
         for i, element in enumerate(self.elements):
             self.elements_listbox.insert(tk.END, f"{element['type']}: {element['text']}")
+
+        # Auto-update web preview if enabled
+        self.on_element_moved()
 
     def update_current_position_display(self, x, y):
         """Update the current position display with absolute coordinates"""
@@ -557,6 +622,7 @@ class ShapePositioningTool:
             if 0 <= index < len(self.elements):
                 self.selected_element = self.elements[index]
                 self.text_var.set(self.selected_element['text'])
+                self.field_name_var.set(self.selected_element.get('field_name', ''))
 
                 # Load font properties
                 font_size = self.selected_element.get('font_size', self.default_font_size)
@@ -582,6 +648,13 @@ class ShapePositioningTool:
 
             self.update_elements_list()
 
+    def on_field_name_changed(self, *args):
+        """Handle field name property change"""
+        if self.selected_element:
+            new_field_name = self.field_name_var.get()
+            self.selected_element['field_name'] = new_field_name
+            self.update_elements_list()
+
     def delete_element(self):
         """Delete the selected element"""
         if self.selected_element:
@@ -595,6 +668,7 @@ class ShapePositioningTool:
             self.elements.remove(self.selected_element)
             self.selected_element = None
             self.text_var.set("")
+            self.field_name_var.set("")
             self.update_elements_list()
 
     def on_canvas_click(self, event):
@@ -766,7 +840,7 @@ class ShapePositioningTool:
                 # Enhanced data structure for the template generator
                 data = {
                     'shape_number': self.current_shape,
-                    'shape_name': self.shape_configs.get(self.current_shape, {}).get('name', f'Shape {self.current_shape}'),
+                    'shape_name': f'Shape {self.current_shape}',
                     'image_path': self.image_path,
                     'canvas_width': 350,
                     'canvas_height': 250,
@@ -1036,6 +1110,137 @@ class ShapePositioningTool:
 
         messagebox.showinfo("Areas Cleared", "All defined areas have been cleared.")
 
+    def toggle_display_overlay(self):
+        """Toggle display dimension overlay on/off"""
+        self.show_display_overlay = self.show_display_overlay_var.get()
+        if self.show_display_overlay:
+            self.update_display_overlay()
+        else:
+            if self.display_overlay_rect_id:
+                self.canvas.delete("display_overlay")
+                self.display_overlay_rect_id = None
+
+    def update_display_overlay(self):
+        """Update the display dimension overlay to show exact web display dimensions"""
+        if not self.image_original or not self.canvas_image_id or not self.show_display_overlay:
+            return
+
+        # Clear existing overlay
+        if self.display_overlay_rect_id:
+            self.canvas.delete("display_overlay")
+
+        # Get image position on canvas
+        canvas_coords = self.canvas.coords(self.canvas_image_id)
+        if len(canvas_coords) != 2:
+            return
+
+        img_center_x, img_center_y = canvas_coords
+        original_width = self.image_original.width
+        original_height = self.image_original.height
+
+        # Calculate display dimensions (300px max width, maintaining aspect ratio)
+        if original_width > self.web_display_width:
+            # Image needs to be scaled down
+            scale_factor = self.web_display_width / original_width
+            display_width = self.web_display_width
+            display_height = original_height * scale_factor
+        else:
+            # Image is smaller than 300px, use original size
+            display_width = original_width
+            display_height = original_height
+
+        self.web_display_height = display_height
+
+        # Calculate overlay rectangle position (centered on image)
+        overlay_left = img_center_x - display_width // 2
+        overlay_top = img_center_y - display_height // 2
+        overlay_right = img_center_x + display_width // 2
+        overlay_bottom = img_center_y + display_height // 2
+
+        # Create blue overlay rectangle showing web display dimensions
+        self.display_overlay_rect_id = self.canvas.create_rectangle(
+            overlay_left, overlay_top, overlay_right, overlay_bottom,
+            outline="#007bff", width=3, fill="", tags="display_overlay",
+            dash=(10, 5)  # Dashed line to distinguish from other overlays
+        )
+
+        # Add dimension labels
+        self.canvas.create_text(
+            img_center_x, overlay_top - 15,
+            text=f"Web Display: {int(display_width)}×{int(display_height)}px",
+            fill="#007bff", font=("Arial", 10, "bold"), tags="display_overlay"
+        )
+
+        # Add corner markers
+        marker_size = 8
+        for x, y in [(overlay_left, overlay_top), (overlay_right, overlay_top),
+                     (overlay_left, overlay_bottom), (overlay_right, overlay_bottom)]:
+            self.canvas.create_rectangle(
+                x - marker_size // 2, y - marker_size // 2,
+                x + marker_size // 2, y + marker_size // 2,
+                fill="#007bff", outline="#0056b3", tags="display_overlay"
+            )
+
+    def save_with_display_dimensions(self):
+        """Save the image cropped to exact web display dimensions"""
+        if not self.image_original:
+            messagebox.showwarning("Warning", "No image to save")
+            return
+
+        try:
+            # Calculate display dimensions
+            original_width = self.image_original.width
+            original_height = self.image_original.height
+
+            if original_width > self.web_display_width:
+                # Scale down to 300px width
+                scale_factor = self.web_display_width / original_width
+                new_width = self.web_display_width
+                new_height = int(original_height * scale_factor)
+            else:
+                # Use original size if smaller than 300px
+                new_width = original_width
+                new_height = original_height
+
+            # Resize image to exact web display dimensions
+            resized_image = self.image_original.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+            # Auto-generate file paths
+            clean_folder = "C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\io\\catalog\\catalog_clean"
+            shape_num = self.current_shape
+            filename = f"shape_{shape_num}_web_display.png"
+            file_path = os.path.join(clean_folder, filename)
+
+            # Create directory if it doesn't exist
+            os.makedirs(clean_folder, exist_ok=True)
+
+            # Save the resized image
+            resized_image.save(file_path)
+
+            # Also save to static/images for web display
+            static_path = f"C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\static\\images\\shape_{shape_num}_web_display.png"
+            static_dir = os.path.dirname(static_path)
+            os.makedirs(static_dir, exist_ok=True)
+            resized_image.save(static_path)
+
+            # Update current image to show the result
+            self.image_original = resized_image
+            self.image_display = ImageTk.PhotoImage(resized_image)
+            self.canvas.itemconfig(self.canvas_image_id, image=self.image_display)
+
+            # Update overlay to match new dimensions
+            if self.show_display_overlay:
+                self.update_display_overlay()
+
+            messagebox.showinfo("Success",
+                f"Image saved at web display dimensions ({new_width}×{new_height}px):\n"
+                f"• {file_path}\n"
+                f"• {static_path}\n\n"
+                f"This matches exactly what appears in the extended row display!")
+
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save with display dimensions: {str(e)}")
+
     def apply_eraser(self, x1, y1, x2, y2):
         """Apply eraser to the selected rectangular area"""
         if not self.image_original or not self.canvas_image_id:
@@ -1090,6 +1295,124 @@ class ShapePositioningTool:
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to apply eraser: {str(e)}")
+
+    def save_shape_locations_json(self, labels):
+        """Save shape field locations to JSON file with lower-left corner as reference"""
+        try:
+            shape_num = self.current_shape
+
+            # Get image dimensions
+            img_width = self.image_original.width if self.image_original else 300
+            img_height = self.image_original.height if self.image_original else 300
+
+            # Reference point is lower-left corner (0, img_height in canvas coords)
+            reference_point = {
+                "x": 0,
+                "y": img_height,
+                "description": "Lower-left corner of image"
+            }
+
+            # Calculate field positions relative to lower-left corner
+            fields = {}
+            field_counter = {}  # Track count for duplicate field names
+
+            for label in labels:
+                field_name = label['text']
+
+                # Handle duplicate field names (like "Input Field")
+                if field_name in field_counter:
+                    field_counter[field_name] += 1
+                    unique_field_name = f"{field_name}_{field_counter[field_name]}"
+                else:
+                    field_counter[field_name] = 1
+                    # For non-duplicate fields, use the field name directly without suffix
+                    unique_field_name = field_name
+
+                # Convert canvas coordinates to image coordinates
+                # First, get image position on canvas
+                try:
+                    canvas_coords = self.canvas.coords(self.canvas_image_id)
+                    if len(canvas_coords) == 2:
+                        img_center_x, img_center_y = canvas_coords
+
+                        # Calculate image boundaries on canvas
+                        img_left = img_center_x - img_width // 2
+                        img_top = img_center_y - img_height // 2
+
+                        # Convert label canvas position to image coordinates
+                        image_x = label['x'] - img_left
+                        image_y = label['y'] - img_top
+
+                        # Clamp to image bounds
+                        image_x = max(0, min(img_width, image_x))
+                        image_y = max(0, min(img_height, image_y))
+
+                    else:
+                        # Fallback to raw coordinates
+                        image_x = label['x']
+                        image_y = label['y']
+                except:
+                    # Fallback to raw coordinates
+                    image_x = label['x']
+                    image_y = label['y']
+
+                # Use direct image coordinates (no double conversion)
+                # The template generation will handle the web display conversion
+
+                # Convert from top-left canvas coordinates to lower-left image coordinates
+                x_from_left = image_x
+                y_from_bottom = img_height - image_y
+
+                fields[unique_field_name] = {
+                    "original_name": field_name,
+                    "x": x_from_left,
+                    "y": y_from_bottom,
+                    "distance_from_reference": {
+                        "x": x_from_left,
+                        "y": y_from_bottom
+                    }
+                }
+
+            # Create JSON structure
+            shape_data = {
+                "shape_number": shape_num,
+                "image_dimensions": {
+                    "width": img_width,
+                    "height": img_height
+                },
+                "reference_point": reference_point,
+                "fields": fields,
+                "timestamp": datetime.now().isoformat()
+            }
+
+            # Save to JSON file
+            json_path = f"C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\test_shape_location.json"
+
+            # Load existing data if file exists
+            existing_data = {}
+            if os.path.exists(json_path):
+                try:
+                    with open(json_path, 'r', encoding='utf-8') as f:
+                        existing_data = json.load(f)
+                except:
+                    existing_data = {}
+
+            # Update with new shape data
+            if "shapes" not in existing_data:
+                existing_data["shapes"] = {}
+
+            existing_data["shapes"][f"shape_{shape_num}"] = shape_data
+
+            # Save updated data
+            with open(json_path, 'w', encoding='utf-8') as f:
+                json.dump(existing_data, f, indent=2, ensure_ascii=False)
+
+            print(f"Shape locations saved to {json_path}")
+            return True
+
+        except Exception as e:
+            print(f"Error saving shape locations: {e}")
+            return False
 
     def save_edited_image(self):
         """Save the edited image to catalog_clean folder"""
@@ -1204,14 +1527,17 @@ class ShapePositioningTool:
         template_file = os.path.join(templates_dir, f"shape_{self.current_shape}.html")
 
         try:
-            # Generate the new template HTML (not JavaScript)
+            # FIRST: Save the field locations to JSON (converts coordinates properly)
+            self.save_shape_locations_json(labels)
+
+            # SECOND: Generate template HTML using the JSON coordinates (ensures consistency)
             template_html = self.generate_shape_template(labels)
 
             # Write template to proper location
             with open(template_file, 'w', encoding='utf-8') as f:
                 f.write(template_html)
 
-            messagebox.showinfo("Success", f"Shape {self.current_shape} template saved to {template_file}\n\nThe web system will automatically load this template when needed.")
+            messagebox.showinfo("Success", f"Shape {self.current_shape} template saved to {template_file}\n\nField locations saved to test_shape_location.json\n\nThe web system will automatically load this template when needed.")
 
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save template file: {str(e)}")
@@ -1264,107 +1590,126 @@ class ShapePositioningTool:
         template_parts.append(f"            <div class=\"shape-diagram-with-input\" style=\"position: relative; text-align: center; padding: 40px 0;\">")
 
         # Generate input field positioning for each label
-        for label in labels_sorted:
-            field_letter = label['text']
+        # Use the JSON coordinates directly to ensure exact positioning
+        for i, label in enumerate(labels_sorted):
+            # Use custom field_name if available, otherwise fall back to text
+            field_letter = label.get('field_name', label['text']) or label['text']
 
-            # Get image position on canvas
-            canvas_coords = self.canvas.coords(self.canvas_image_id)
-            if len(canvas_coords) == 2:
-                img_center_x, img_center_y = canvas_coords
-                img_width = self.image_original.width
-                img_height = self.image_original.height
+            # Load the JSON coordinates if available
+            json_file_path = "test_shape_location.json"
+            json_coords = None
 
-                # Calculate image boundaries on canvas
-                img_left = img_center_x - img_width // 2
-                img_top = img_center_y - img_height // 2
+            try:
+                if os.path.exists(json_file_path):
+                    with open(json_file_path, 'r') as f:
+                        json_data = json.load(f)
 
-                # Convert label position to relative position within image
-                relative_x = (label['x'] - img_left) / img_width
-                relative_y = (label['y'] - img_top) / img_height
+                    shape_key = f"shape_{shape_num}"
+                    if shape_key in json_data.get('shapes', {}):
+                        # Find the matching field in JSON
+                        field_counter = len([l for l in labels_sorted if l['text'] == 'Input Field' and labels_sorted.index(l) <= labels_sorted.index(label)])
+                        if field_letter == "Input Field":
+                            field_name = f"Input Field_{field_counter}"
+                        else:
+                            field_name = field_letter
 
-                # Clamp values to reasonable ranges (allow full range for precision)
-                relative_x = max(0.0, min(1.0, relative_x))
-                relative_y = max(0.0, min(1.0, relative_y))
+                        fields = json_data['shapes'][shape_key]['fields']
+                        # Try multiple lookup strategies
+                        if field_name in fields:
+                            json_coords = fields[field_name]
+                        else:
+                            # Try to find by original_name
+                            for key, field_data in fields.items():
+                                if field_data.get('original_name') == field_letter:
+                                    json_coords = field_data
+                                    break
+                            else:
+                                # Try positional matching as fallback (field index)
+                                field_keys = list(fields.keys())
+                                if i < len(field_keys):
+                                    json_coords = fields[field_keys[i]]
+            except Exception as e:
+                print(f"Warning: Could not load JSON coordinates: {e}")
 
-                # Convert to percentages for web display accounting for actual template layout
-                # The template has a container where inputs are positioned absolutely,
-                # but the image appears below with margin-top: 20px
-                # We need to map image coordinates to container coordinates
+            if json_coords:
+                # Use JSON coordinates (lower-left reference system)
+                orig_x = json_coords['x']
+                orig_y = json_coords['y']
 
-                # In the final template:
-                # - Container has padding: 40px 0 (top/bottom padding)
-                # - Image has margin-top: 20px and is max-width: 300px
-                # - Input fields are positioned absolutely within the container
+                # Apply the SAME scaling and calculations as web display
+                original_width = self.image_original.width
+                original_height = self.image_original.height
 
-                # Calculate the effective image position within the container
-                container_padding_top = 40  # padding from container style
-                image_margin_top = 20       # margin-top from image style
+                # Web display scaling
+                web_max_width = 300
+                scale_factor = web_max_width / original_width
+                web_width = web_max_width
+                web_height = original_height * scale_factor
 
-                # The image effectively starts at this position in the container
-                effective_image_top = container_padding_top + image_margin_top
+                # CSS styling: padding: 20px on the image
+                image_padding = 20
+                effective_image_width = web_width - (2 * image_padding)
+                effective_image_height = web_height - (2 * image_padding)
 
-                # Convert image-relative coordinates to container-relative percentages
-                # Get actual image dimensions for proper scaling
-                actual_img_width = self.image_original.width
-                actual_img_height = self.image_original.height
+                # Content scaling to effective area
+                content_scale_x = effective_image_width / original_width
+                content_scale_y = effective_image_height / original_height
 
-                # Template displays image with max-width: 300px
-                display_img_width = 300
-                # Calculate display height maintaining aspect ratio
-                display_img_height = (actual_img_height / actual_img_width) * display_img_width
+                # Scale coordinates to effective content area
+                scaled_x = orig_x * content_scale_x
+                scaled_y = orig_y * content_scale_y
 
-                # Container dimensions (based on template structure)
-                container_width = 400  # Approximate container width for horizontal centering
-                # Container height = padding-top + image height + padding for inputs
-                container_height = container_padding_top + image_margin_top + display_img_height + 40
+                # CORRECT REFERENCE: Position relative to IMAGE BOTTOM
+                # Calculate how far the image bottom is from container bottom
+                # Then add the field's distance from image bottom
 
-                # Map the relative position on the image to the position in the container
-                # The image is centered in the container (text-align: center)
-                # Image is 300px wide in a wider container
-                # We need to calculate where the image sits within the container
-                # and then position relative to the image location
+                # CORRECTED: Actual container structure analysis
+                # Based on actual field positioning: 61px container-to-image offset
+                distance_from_container_to_image_bottom = 61  # Empirically determined correct offset
 
-                # Since image is centered and 300px wide, calculate its position
-                # The template uses text-align: center and the image has max-width: 300px
-                # We need to be more conservative with the scaling
-                # The actual container in the modal/page is wider than 400px
-                # Let's use a more accurate scaling factor
-                image_width_percent = 60  # More conservative estimate for 300px image in wider container
-                image_left_offset = (100 - image_width_percent) / 2  # Center offset (20% on each side)
-                web_left_percent = image_left_offset + (relative_x * image_width_percent)
+                # Field position = distance from container bottom to image bottom + field distance from image bottom
+                web_bottom_px = distance_from_container_to_image_bottom + scaled_y
 
-                # Vertical: account for where image actually appears in the container
-                web_top_percent = ((effective_image_top + relative_y * display_img_height) / container_height) * 100
+                # Convert x to offset from center (within content area)
+                # Add padding offset to account for left padding
+                x_in_full_image = image_padding + scaled_x
+                center_offset_x = x_in_full_image - (web_width / 2)
+                web_left_px = center_offset_x
+
             else:
-                # Fallback positioning
-                web_left_percent = 50
-                web_top_percent = 50
+                # Fallback: use old coordinate system as backup
+                # This should not happen if JSON file exists and is correct
+                print(f"Warning: Using fallback positioning for {field_letter}")
+                web_bottom_px = 150 + (i * 50)  # Simple fallback
+                web_left_px = 0
 
             # Check if this is a standalone input field (created via "Add Input Field")
             is_standalone_input = field_letter == "Input Field"
 
             if is_standalone_input:
-                # Create standalone input field without label
+                # Create standalone input field without label using absolute pixel positioning with BOTTOM reference
                 template_parts.append(f"                <!-- Standalone input field -->")
-                template_parts.append(f"                <div style=\"position: absolute; top: {web_top_percent:.1f}%; left: {web_left_percent:.1f}%; transform: translate(-50%, -50%);\">")
+                template_parts.append(f"                <div style=\"position: absolute; bottom: {web_bottom_px:.0f}px; left: calc(50% + {web_left_px:.0f}px); transform: translate(-50%, 50%);\">")
                 template_parts.append(f"                    <input type=\"text\"")
                 template_parts.append(f"                           id=\"length-field_{len([l for l in labels_sorted if l['text'] == 'Input Field' and labels_sorted.index(l) <= labels_sorted.index(label)])}-{shape_num}\"")
+                template_parts.append(f"                           name=\"{field_letter}\"")
                 template_parts.append(f"                           class=\"inline-shape-input shape-{shape_num}-input\"")
                 template_parts.append(f"                           maxlength=\"8\"")
                 template_parts.append(f"                           placeholder=\"0\"")
-                template_parts.append(f"                           style=\"width: 80px; height: 28px; font-size: 18px; border: 2px solid #4a90e2; border-radius: 4px; background: #e6f2ff;\">")
+                template_parts.append(f"                           style=\"width: 60px; height: 20px; font-size: 12px; border: 2px solid black; border-radius: 0px; background: white;\">")
                 template_parts.append(f"                </div>")
             else:
-                # Create labeled input field
+                # Create labeled input field using absolute pixel positioning with BOTTOM reference
                 template_parts.append(f"                <!-- {field_letter} field with label -->")
-                template_parts.append(f"                <div style=\"position: absolute; top: {web_top_percent:.1f}%; left: {web_left_percent:.1f}%; transform: translate(-50%, -50%); display: flex; align-items: center;\">")
+                template_parts.append(f"                <div style=\"position: absolute; bottom: {web_bottom_px:.0f}px; left: calc(50% + {web_left_px:.0f}px); transform: translate(-50%, 50%); display: flex; align-items: center;\">")
                 template_parts.append(f"                    <span style=\"font-size: 20px; font-weight: bold; color: red; margin-right: 8px;\">{field_letter}</span>")
                 template_parts.append(f"                    <input type=\"text\"")
                 template_parts.append(f"                           id=\"length-{field_letter}-{shape_num}\"")
+                template_parts.append(f"                           name=\"{field_letter}\"")
                 template_parts.append(f"                           class=\"inline-shape-input shape-{shape_num}-input\"")
                 template_parts.append(f"                           maxlength=\"8\"")
                 template_parts.append(f"                           placeholder=\"0\"")
-                template_parts.append(f"                           style=\"width: 80px; height: 28px; font-size: 18px; border: 2px solid #4a90e2; border-radius: 4px; background: #e6f2ff;\">")
+                template_parts.append(f"                           style=\"width: 60px; height: 20px; font-size: 12px; border: 2px solid black; border-radius: 0px; background: white;\">")
                 template_parts.append(f"                </div>")
 
         # Add image after input fields (matches current template structure)
@@ -1513,6 +1858,203 @@ class ShapePositioningTool:
             positions['elements'].append(abs_pos)
 
         return positions
+
+    def update_web_preview(self):
+        """Update the web display preview"""
+        try:
+            # Clear the web canvas
+            self.web_canvas.delete("all")
+
+            if not self.image_original or not self.elements:
+                # Show placeholder text
+                self.web_canvas.create_text(150, 200, text="No preview available\nAdd elements to see preview",
+                                          fill="gray", font=("Arial", 12), justify="center")
+                return
+
+            # Skip template generation for now - just focus on positioning preview
+
+            # Simulate web display by drawing the image and input fields
+            img_width, img_height = self.image_original.size
+
+            # Scale image to fit in 300px width (web display size)
+            scale_factor = 300 / img_width
+            scaled_width = 300
+            scaled_height = int(img_height * scale_factor)
+
+            # Draw container background with padding
+            container_padding = 40
+            container_width = scaled_width + 40  # 20px padding on each side
+            container_height = scaled_height + 2 * container_padding
+
+            # Draw container
+            self.web_canvas.create_rectangle(10, 10, 10 + container_width, 10 + container_height,
+                                           fill="#f8fafc", outline="#e5e7eb", width=2)
+
+            # Draw image area
+            img_x = 10 + 20  # Container x + side padding
+            img_y = 10 + container_padding  # Container y + top padding
+
+            self.web_canvas.create_rectangle(img_x, img_y, img_x + scaled_width, img_y + scaled_height,
+                                           fill="white", outline="#ddd", width=2)
+
+            # Add image label
+            self.web_canvas.create_text(img_x + scaled_width//2, img_y + scaled_height//2,
+                                      text=f"Shape {self.current_shape}\n{scaled_width}x{scaled_height}px",
+                                      fill="gray", font=("Arial", 10), justify="center")
+
+            # Clear field items mapping
+            self.web_field_items = {}
+
+            # Draw input fields based on current elements
+            for i, element in enumerate(self.elements):
+                if element['type'] == 'input':
+                    # Get element position relative to image
+                    elem_x = element['x']
+                    elem_y = element['y']
+
+                    # Convert to web display coordinates
+                    web_x = img_x + (elem_x * scale_factor)
+                    web_y = img_y + (elem_y * scale_factor)
+
+                    # Draw input field
+                    field_width = 80
+                    field_height = 28
+
+                    field_x = web_x - field_width//2
+                    field_y = web_y - field_height//2
+
+                    # Input field background with tags for dragging - smaller black frame with white interior
+                    field_rect = self.web_canvas.create_rectangle(field_x, field_y, field_x + field_width, field_y + field_height,
+                                                   fill="white", outline="black", width=2,
+                                                   tags=f"web_field_{i}")
+
+                    # Input field text
+                    field_text = self.web_canvas.create_text(web_x, web_y, text=element.get('text', '0'),
+                                              fill="#333", font=("Arial", 10),
+                                              tags=f"web_field_{i}")
+
+                    # Store field items for interaction
+                    self.web_field_items[i] = {
+                        'rect': field_rect,
+                        'text': field_text,
+                        'element_index': i,
+                        'scale_factor': scale_factor,
+                        'img_x': img_x,
+                        'img_y': img_y
+                    }
+
+            # Update canvas scroll region
+            self.web_canvas.configure(scrollregion=self.web_canvas.bbox("all"))
+
+        except Exception as e:
+            print(f"Error updating web preview: {e}")
+            self.web_canvas.create_text(150, 200, text=f"Preview error:\n{str(e)}",
+                                      fill="red", font=("Arial", 10), justify="center")
+
+    def toggle_web_preview(self):
+        """Toggle auto-update for web preview"""
+        if self.show_web_preview_var.get():
+            self.update_web_preview()
+
+    def on_element_moved(self):
+        """Called when an element is moved - update preview if auto-update is enabled"""
+        if hasattr(self, 'show_web_preview_var') and self.show_web_preview_var.get():
+            self.update_web_preview()
+
+    def on_web_canvas_click(self, event):
+        """Handle clicks on the web preview canvas"""
+        # Find which field was clicked
+        clicked_item = self.web_canvas.find_closest(event.x, event.y)[0]
+
+        # Check if clicked item belongs to a field
+        for i, field_data in self.web_field_items.items():
+            if clicked_item in [field_data['rect'], field_data['text']]:
+                self.web_selected_element = i
+                self.web_drag_data["x"] = event.x
+                self.web_drag_data["y"] = event.y
+
+                # Highlight selected field
+                self.web_canvas.itemconfig(field_data['rect'], outline="#ff6b35", width=3)
+                return
+
+        # No field selected
+        self.web_selected_element = None
+
+    def on_web_canvas_drag(self, event):
+        """Handle dragging in the web preview canvas"""
+        if self.web_selected_element is not None and self.web_selected_element in self.web_field_items:
+            # Calculate drag distance
+            dx = event.x - self.web_drag_data["x"]
+            dy = event.y - self.web_drag_data["y"]
+
+            field_data = self.web_field_items[self.web_selected_element]
+
+            # Move the visual elements
+            self.web_canvas.move(field_data['rect'], dx, dy)
+            self.web_canvas.move(field_data['text'], dx, dy)
+
+            # Update drag data
+            self.web_drag_data["x"] = event.x
+            self.web_drag_data["y"] = event.y
+
+    def on_web_canvas_release(self, event):
+        """Handle mouse release in web preview canvas"""
+        if self.web_selected_element is not None and self.web_selected_element in self.web_field_items:
+            field_data = self.web_field_items[self.web_selected_element]
+            element_index = field_data['element_index']
+
+            # Get current field position in web canvas
+            field_coords = self.web_canvas.coords(field_data['text'])
+            web_x, web_y = field_coords[0], field_coords[1]
+
+            # Convert back to image coordinates
+            img_x = field_data['img_x']
+            img_y = field_data['img_y']
+            scale_factor = field_data['scale_factor']
+
+            # Calculate new position relative to image
+            new_image_x = (web_x - img_x) / scale_factor
+            new_image_y = (web_y - img_y) / scale_factor
+
+            # Update the element in the main elements list
+            if element_index < len(self.elements):
+                old_x = self.elements[element_index]['x']
+                old_y = self.elements[element_index]['y']
+
+                self.elements[element_index]['x'] = new_image_x
+                self.elements[element_index]['y'] = new_image_y
+
+                # Update the main canvas as well
+                self.update_element_on_main_canvas(element_index, new_image_x, new_image_y)
+
+                # Update elements list
+                self.update_elements_list()
+
+                print(f"Field moved from ({old_x:.1f}, {old_y:.1f}) to ({new_image_x:.1f}, {new_image_y:.1f})")
+
+            # Reset outline
+            self.web_canvas.itemconfig(field_data['rect'], outline="black", width=2)
+
+        self.web_selected_element = None
+
+    def update_element_on_main_canvas(self, element_index, new_x, new_y):
+        """Update element position on the main canvas"""
+        if element_index < len(self.elements):
+            element = self.elements[element_index]
+
+            # Update canvas items
+            if 'rect_id' in element:
+                # Move rectangle
+                old_coords = self.canvas.coords(element['rect_id'])
+                if len(old_coords) >= 4:
+                    width = old_coords[2] - old_coords[0]
+                    height = old_coords[3] - old_coords[1]
+                    self.canvas.coords(element['rect_id'], new_x - width/2, new_y - height/2,
+                                     new_x + width/2, new_y + height/2)
+
+            if 'text_id' in element:
+                # Move text
+                self.canvas.coords(element['text_id'], new_x, new_y)
 
     def run(self):
         """Run the application"""

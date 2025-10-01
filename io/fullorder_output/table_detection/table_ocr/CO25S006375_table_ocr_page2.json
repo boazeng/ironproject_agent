@@ -1,0 +1,24 @@
+{
+  "agent": "form1ocr2",
+  "version": "1.0",
+  "order_number": "CO25S006375",
+  "page_number": "2",
+  "timestamp": 1758994712.6108532,
+  "table_data": {
+    "format": "format 1",
+    "page_number": "מספר העמוד",
+    "total_rows": 1,
+    "rows": [
+      {
+        "row_number": 1,
+        "מס": "10",
+        "shape": "קו אופקי",
+        "קוטר": "18",
+        "סהכ יחידות": "36",
+        "אורך": "4.5",
+        "משקל": "323.5",
+        "הערות": "C2-C7 20/90"
+      }
+    ]
+  }
+}

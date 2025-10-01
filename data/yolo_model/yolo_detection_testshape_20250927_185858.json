@@ -1,0 +1,8 @@
+{
+  "detections": [],
+  "shape_count": 0,
+  "confidence_scores": [],
+  "image_path": "C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\data\\yolo_model\\testshape.png",
+  "timestamp": "2025-09-27T18:58:58.408665",
+  "model_path": "C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\data\\yolo_model\\yolo.pt"
+}

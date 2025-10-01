@@ -1,0 +1,38 @@
+{
+  "total_lines": 5,
+  "lines": [
+    {
+      "line_number": 1,
+      "length": 80,
+      "angle_to_next": "90°"
+    },
+    {
+      "line_number": 2,
+      "length": 80,
+      "angle_to_next": "90°"
+    },
+    {
+      "line_number": 3,
+      "length": 80,
+      "angle_to_next": "90°"
+    },
+    {
+      "line_number": 4,
+      "length": 80,
+      "angle_to_next": "90°"
+    },
+    {
+      "line_number": 5,
+      "length": 0,
+      "angle_to_next": "unknown"
+    }
+  ],
+  "metadata": {
+    "image_path": "C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\io\\temp_shape\\CO25S006375_drawing_row_3_page1.png",
+    "image_name": "CO25S006375_drawing_row_3_page1.png",
+    "timestamp": "2025-09-24T15:32:17.752813",
+    "model_used": "gpt-4o",
+    "agent": "shape1s2",
+    "opencv_detected_lines": 5
+  }
+}

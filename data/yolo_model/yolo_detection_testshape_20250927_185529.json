@@ -1,0 +1,133 @@
+{
+  "detections": [
+    {
+      "shape_number": 1,
+      "bbox": {
+        "x1": 259.8039245605469,
+        "y1": 42.6510124206543,
+        "x2": 1031.35595703125,
+        "y2": 250.94696044921875
+      },
+      "confidence": 0.4938366711139679,
+      "class_name": "complex",
+      "center": {
+        "x": 645.5799407958984,
+        "y": 146.79898643493652
+      }
+    },
+    {
+      "shape_number": 2,
+      "bbox": {
+        "x1": 298.0855712890625,
+        "y1": 35.34761047363281,
+        "x2": 946.1295776367188,
+        "y2": 251.0666046142578
+      },
+      "confidence": 0.2900068163871765,
+      "class_name": "U-shape",
+      "center": {
+        "x": 622.1075744628906,
+        "y": 143.2071075439453
+      }
+    }
+  ],
+  "shape_count": 2,
+  "confidence_scores": [
+    0.4938366711139679,
+    0.2900068163871765
+  ],
+  "avg_confidence": 0.3919217437505722,
+  "max_confidence": 0.4938366711139679,
+  "ribs": [
+    {
+      "shape_number": 1,
+      "estimated_ribs": [
+        {
+          "name": "horizontal",
+          "length": 772,
+          "unit": "pixels"
+        },
+        {
+          "name": "vertical",
+          "length": 208,
+          "unit": "pixels"
+        },
+        {
+          "name": "diagonal",
+          "length": 799.5298618563287,
+          "unit": "pixels"
+        }
+      ],
+      "perimeter": 1960,
+      "area": 160576
+    },
+    {
+      "shape_number": 2,
+      "estimated_ribs": [
+        {
+          "name": "horizontal",
+          "length": 648,
+          "unit": "pixels"
+        },
+        {
+          "name": "vertical",
+          "length": 216,
+          "unit": "pixels"
+        },
+        {
+          "name": "diagonal",
+          "length": 683.05197459637,
+          "unit": "pixels"
+        }
+      ],
+      "perimeter": 1728,
+      "area": 139968
+    }
+  ],
+  "angles": [
+    {
+      "shape_number": 1,
+      "angles": [
+        {
+          "name": "corner_angle",
+          "value": 90.0,
+          "unit": "degrees"
+        },
+        {
+          "name": "diagonal_angle",
+          "value": 15.079133974961133,
+          "unit": "degrees"
+        },
+        {
+          "name": "complementary_angle",
+          "value": 74.92086602503886,
+          "unit": "degrees"
+        }
+      ]
+    },
+    {
+      "shape_number": 2,
+      "angles": [
+        {
+          "name": "corner_angle",
+          "value": 90.0,
+          "unit": "degrees"
+        },
+        {
+          "name": "diagonal_angle",
+          "value": 18.43494882292201,
+          "unit": "degrees"
+        },
+        {
+          "name": "complementary_angle",
+          "value": 71.56505117707799,
+          "unit": "degrees"
+        }
+      ]
+    }
+  ],
+  "annotated_image": "C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\data\\yolo_model\\yolo_annotated_testshape_20250927_185529.png",
+  "image_path": "C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\data\\yolo_model\\testshape.png",
+  "timestamp": "2025-09-27T18:55:29.333683",
+  "model_path": "C:\\Users\\User\\Aiprojects\\Iron-Projects\\Agents\\data\\yolo_model\\yolo.pt"
+}

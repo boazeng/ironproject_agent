@@ -1,0 +1,48 @@
+{
+  "metadata": {
+    "created": "2025-08-31T22:08:58.015273",
+    "description": "Catalog shape definitions and characteristics",
+    "total_records": 2,
+    "last_updated": "2025-08-31T22:20:12.025741"
+  },
+  "shapes": [
+    {
+      "id": "88a67950-6144-4ce3-aab9-7ad5c5f57cf0",
+      "timestamp": "2025-08-31T22:08:58.047469",
+      "shape_name": "test_u_shape",
+      "shape_type": "U-shape",
+      "rib_count": 3,
+      "dimensions": [
+        50,
+        110,
+        50
+      ],
+      "file_path": "",
+      "description": "Symmetric U-shape with equal legs",
+      "tags": [
+        "symmetric",
+        "3-rib",
+        "u-shape"
+      ]
+    },
+    {
+      "id": "e0fb76cf-6f19-4a64-81d8-ed628ca6a36f",
+      "timestamp": "2025-08-31T22:20:12.025707",
+      "shape_name": "test_u_shape",
+      "shape_type": "U-shape",
+      "rib_count": 3,
+      "dimensions": [
+        50,
+        110,
+        50
+      ],
+      "file_path": "",
+      "description": "Symmetric U-shape with equal legs",
+      "tags": [
+        "symmetric",
+        "3-rib",
+        "u-shape"
+      ]
+    }
+  ]
+}

@@ -2,8 +2,8 @@
   "number_of_rows": 1,
   "analysis_method": "ChatGPT Vision API",
   "model_used": "gpt-4o",
-  "input_file": "CO25S006375_table_body_page2.png",
-  "chatgpt_analysis": "The table contains one data row with order information below the header row.",
+  "input_file": "CO25S006375_table_bodyonly_page2.png",
+  "chatgpt_analysis": "The table contains one data row with order information.",
   "row_coordinates": [
     {
       "row_number": 1,

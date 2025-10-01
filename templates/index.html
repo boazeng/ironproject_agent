@@ -41,12 +41,11 @@
                 <span class="btn-icon">▶</span>
                 הרץ ניתוח
             </button>
-            <button id="refresh-data" class="btn btn-secondary">
-                <span class="btn-icon">🔄</span>
-                רענן נתונים
-            </button>
         </div>
     </header>
+
+    <!-- Progress Notifications -->
+    <div id="progress-notifications" class="progress-notifications"></div>
 
     <!-- Main Content -->
     <div class="main-container">
@@ -194,6 +193,12 @@
                             </tbody>
                         </table>
                     </div>
+                    <div class="table-controls" style="text-align: center; margin: 10px 0;">
+                        <button id="refresh-table-btn" class="btn btn-small btn-primary" title="רענן נתוני טבלה">
+                            <span class="btn-icon">🔄</span>
+                            רענן נתונים
+                        </button>
+                    </div>
                     <div class="table-summary">
                         <div class="summary-item">
                             <span>סה"כ שורות:</span>
@@ -298,6 +303,7 @@
     </footer>
 
     <script src="{{ url_for('static', filename='js/app.js') }}?v={{ range(1000000000, 9999999999) | random }}"></script>
+    <script src="{{ url_for('static', filename='js/shape-modals-simple.js') }}?v={{ range(1000000000, 9999999999) | random }}"></script>
 
     <!-- INLINE TEST SCRIPT -->
     <script>
@@ -326,5 +332,17 @@
         }
     }, 3000);
     </script>
+
+    <!-- Catalog Shape Popup Modal -->
+    <div id="catalogShapeModal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h3 id="modal-title">צורת קטלוג</h3>
+
+            <!-- Shape container - will be populated dynamically -->
+            <div id="shape-container"></div>
+        </div>
+    </div>
+
 </body>
 </html>
