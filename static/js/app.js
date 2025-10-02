@@ -1,4 +1,58 @@
-// Global variables - CACHE BUST: 2025-09-21-23:20 - MANUAL TEST ADDED
+// Global variables - CACHE BUST: 2025-10-01-20:50 - TEMPLATE BORDER FIX 110px HEIGHT 55% TOP
+
+// Function to open template in a modal
+function openTemplateModal(catalogNumber, rowIndex) {
+    console.log(`[TEMPLATE MODAL] Opening template ${catalogNumber} for row ${rowIndex}`);
+
+    // Create modal overlay
+    const modal = document.createElement('div');
+    modal.id = 'template-modal';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.7); z-index: 10000; display: flex;
+        align-items: center; justify-content: center;
+    `;
+
+    // Create modal content
+    const modalContent = document.createElement('div');
+    modalContent.style.cssText = `
+        background: white; border-radius: 10px; padding: 20px;
+        max-width: 90%; max-height: 90%; overflow: auto; position: relative;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+    `;
+
+    modalContent.innerHTML = `
+        <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 15px; border-bottom: 2px solid #eee; padding-bottom: 10px;">
+            <h3 style="margin: 0; color: #333;">Template ${catalogNumber} - Row ${parseInt(rowIndex) + 1}</h3>
+            <button onclick="closeTemplateModal()" style="background: #ff4757; color: white; border: none; border-radius: 5px; padding: 8px 12px; cursor: pointer; font-size: 14px; float: right;">✕ Close</button>
+        </div>
+        <div id="modal-template-content" style="min-height: 200px;">
+            <div style="text-align: center; padding: 50px; color: #666;">Loading template...</div>
+        </div>
+    `;
+
+    modal.appendChild(modalContent);
+    document.body.appendChild(modal);
+
+    // Load template content
+    fetch('/shape_template/' + catalogNumber)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById('modal-template-content').innerHTML = html;
+        })
+        .catch(error => {
+            document.getElementById('modal-template-content').innerHTML =
+                '<div style="color: red; text-align: center; padding: 20px;">Error loading template: ' + error.message + '</div>';
+        });
+}
+
+// Function to close template modal
+function closeTemplateModal() {
+    const modal = document.getElementById('template-modal');
+    if (modal) {
+        modal.remove();
+    }
+}
 let pdfDoc = null;
 let pageNum = 1;
 let pageRendering = false;
@@ -54,9 +108,53 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Removed: Order header section display - not needed anymore
 
-    // Initialize page displays
+    // Initialize page displays with tab activation fix
+    console.log('[INIT] 🚀 STARTING INITIALIZATION WITH TAB FIX');
+
+    // Check if we need to initialize tab state
     setTimeout(() => {
-        updatePageDisplays(1);
+        console.log('[INIT] 🎯 Checking tab initialization...');
+
+        // Check which tab should be active (don't force table tab)
+        const activeTabBtn = document.querySelector('.tab-btn.active');
+        const activeTabContent = document.querySelector('.tab-content.active');
+
+        if (activeTabBtn && activeTabContent) {
+            const tabName = activeTabBtn.dataset.tab;
+            console.log('[INIT] ✅ Tab system initialized, active tab:', tabName);
+        } else {
+            console.log('[INIT] ❌ Tab system not properly initialized');
+        }
+
+        // Force check table element
+        const tableElement = document.getElementById('items-tbody');
+        console.log('[INIT] 🔍 Table element after tab fix:', tableElement);
+
+        if (tableElement) {
+            console.log('[INIT] ✅ TABLE FOUND! Proceeding with data loading...');
+            updatePageDisplays(1);
+        } else {
+            console.log('[INIT] ❌ TABLE STILL NOT FOUND - checking all possible elements...');
+
+            // Debug: List all tbody elements
+            const allTbodies = document.querySelectorAll('tbody');
+            console.log('[INIT] 🔍 All tbody elements found:', allTbodies.length);
+            allTbodies.forEach((tb, i) => {
+                console.log(`[INIT] tbody ${i}: id="${tb.id}", visible="${tb.offsetParent !== null}"`);
+            });
+
+            // Try alternative approaches
+            setTimeout(() => {
+                console.log('[INIT] 🔄 RETRY: Checking table element again...');
+                const retryTableElement = document.getElementById('items-tbody');
+                if (retryTableElement) {
+                    console.log('[INIT] ✅ TABLE FOUND ON RETRY! Loading data...');
+                    updatePageDisplays(1);
+                } else {
+                    console.log('[INIT] 💥 FINAL FAILURE: Table element never found');
+                }
+            }, 1000);
+        }
     }, 500);
 
 
@@ -504,6 +602,13 @@ async function autoUploadFromInputFolder() {
 
 // Display analysis data in the UI
 function displayAnalysisData(data) {
+    console.log('🎯 [DISPLAY ANALYSIS] Function called with data:', data);
+    console.log('🎯 [DISPLAY ANALYSIS] Data type:', typeof data);
+    console.log('🎯 [DISPLAY ANALYSIS] Data keys:', Object.keys(data || {}));
+
+    // Store data for later use when switching tabs
+    window.lastAnalysisData = data;
+
     // Update header info - prioritize data.analysis.sections as it contains complete key_values
     const sections = (data.analysis && data.analysis.sections) || data.sections;
     
@@ -551,19 +656,36 @@ function displayAnalysisData(data) {
                 });
             }
         }
+    }
 
-        // Process OCR data if available (prioritize over header data)
-        if (data.ocr_data) {
-            console.log('Processing OCR data:', data.ocr_data);
-            const ocrData = data.ocr_data;
+    // Process OCR data if available (prioritize over header data) - MOVED OUTSIDE sections block
+    // Support multiple data formats: analysis.section_2_ocr, data.section_2_ocr, data.ocr_data
+    console.log('🔍 [OCR DEBUG] Checking for OCR data in:', data);
+    console.log('🔍 [OCR DEBUG] data.analysis:', data.analysis);
+    console.log('🔍 [OCR DEBUG] data.analysis?.section_2_ocr:', data.analysis?.section_2_ocr);
+    console.log('🔍 [OCR DEBUG] data.section_2_ocr:', data.section_2_ocr);
+    console.log('🔍 [OCR DEBUG] data.ocr_data:', data.ocr_data);
 
-            // Map OCR fields to form fields with null checks
-            if (ocrData['לקוח/פרויקט'] && ocrData['לקוח/פרויקט'] !== 'empty') {
-                const customerEl = document.getElementById('detail-customer');
-                const customerNameEl = document.getElementById('customer-name');
-                if (customerEl) customerEl.value = ocrData['לקוח/פרויקט'];
-                if (customerNameEl) customerNameEl.textContent = ocrData['לקוח/פרויקט'];
-            }
+    const ocrData = (data.analysis && data.analysis.section_2_ocr) || data.section_2_ocr || data.ocr_data;
+    console.log('🔍 [OCR DEBUG] Final resolved ocrData:', ocrData);
+
+    if (ocrData) {
+        console.log('✅ [OCR DEBUG] Processing OCR data:', ocrData);
+
+        // Map OCR fields to form fields with null checks
+        console.log('🔍 [OCR DEBUG] Starting field mapping...');
+
+        if (ocrData['לקוח/פרויקט'] && ocrData['לקוח/פרויקט'] !== 'empty') {
+            console.log('✅ [OCR DEBUG] Setting customer:', ocrData['לקוח/פרויקט']);
+            const customerEl = document.getElementById('detail-customer');
+            const customerNameEl = document.getElementById('customer-name');
+            console.log('🔍 [OCR DEBUG] customerEl:', customerEl);
+            console.log('🔍 [OCR DEBUG] customerNameEl:', customerNameEl);
+            if (customerEl) customerEl.value = ocrData['לקוח/פרויקט'];
+            if (customerNameEl) customerNameEl.textContent = ocrData['לקוח/פרויקט'];
+        } else {
+            console.log('❌ [OCR DEBUG] Customer field not found or empty:', ocrData['לקוח/פרויקט']);
+        }
             if (ocrData['איש קשר באתר'] && ocrData['איש קשר באתר'] !== 'empty') {
                 const contactEl = document.getElementById('detail-contact');
                 if (contactEl) contactEl.value = ocrData['איש קשר באתר'];
@@ -602,130 +724,145 @@ function displayAnalysisData(data) {
             console.log('OCR data has been populated to form fields');
 
             // Removed: showOrderHeaderSection() call
-        }
-            
-            // Display order header image for page 1
-            const headerImage = document.getElementById('order-header-image');
-            if (headerImage && data.file) {
-                // Extract the order number from the filename
-                const orderNumber = data.file.replace('.pdf', '');
-                // Always use page 1 header image
-                const headerImageUrl = `/order_header_image/${orderNumber}_order_title_page1_order_header.png`;
+    }
 
-                headerImage.onerror = function() {
-                    console.log('Header image not found, trying alternative path...');
-                    // Fallback to the default image if specific one not found
-                    this.src = '/order_header_image/CO25S006375_order_title_page1_order_header.png';
-                };
+    // Display order header image for page 1
+    const headerImage = document.getElementById('order-header-image');
+    if (headerImage && data.file) {
+        // Extract the order number from the filename
+        const orderNumber = data.file.replace('.pdf', '');
+        // Always use page 1 header image
+        const headerImageUrl = `/order_header_image/${orderNumber}_order_title_page1_order_header.png`;
 
-                headerImage.src = headerImageUrl;
-                console.log('🖼️ Loading header image:', headerImageUrl);
-            }
+        headerImage.onerror = function() {
+            console.log('Header image not found, trying alternative path...');
+            // Fallback to the default image if specific one not found
+            this.src = '/order_header_image/CO25S006375_order_title_page1_order_header.png';
+        };
 
-        // Table section
-        if (sections.main_table && sections.main_table.found) {
-            const table = sections.main_table;
-            document.getElementById('total-rows').textContent = table.row_count || 0;
-            document.getElementById('order-type').textContent = 
-                table.contains_iron_orders ? 'הזמנת ברזל' : 'אחר';
-            
-            // Populate table with sample items
+        headerImage.src = headerImageUrl;
+        console.log('🖼️ Loading header image:', headerImageUrl);
+    }
+
+    // Table section - only populate table if table-tab is active
+    if (sections && sections.main_table && sections.main_table.found) {
+        const table = sections.main_table;
+
+        // Check if table tab is active before populating
+        const tableTab = document.getElementById('table-tab');
+        const isTableTabActive = tableTab && tableTab.classList.contains('active');
+
+        console.log('[TABLE] Table data found, checking if table tab is active...');
+        console.log('[TABLE] Table tab element:', tableTab);
+        console.log('[TABLE] Is table tab active:', isTableTabActive);
+
+        if (isTableTabActive) {
+                console.log('[TABLE] ✅ Table tab is active - populating table data');
+                document.getElementById('total-rows').textContent = table.row_count || 0;
+                document.getElementById('order-type').textContent =
+                    table.contains_iron_orders ? 'הזמנת ברזל' : 'אחר';
+
+                // Populate table with sample items
+                const tbody = document.getElementById('items-tbody');
+                tbody.innerHTML = '';
+
+                // Use all_items if available, otherwise fall back to sample_items
+                const items = table.all_items || table.sample_items || [];
+                if (items.length > 0) {
+                    items.forEach((item, index) => {
+                        const row = tbody.insertRow();
+                        row.setAttribute('data-row-id', index);
+
+                        // Get actual order line number
+                        const itemOrderLineNo = Array.isArray(item) ? (item[0] || (index + 1)) : (item['מס'] || item['מס\''] || (index + 1));
+                        row.setAttribute('data-order-line-no', itemOrderLineNo);
+
+                        // Expand button and identification button
+                        const expandCell = row.insertCell(0);
+                        expandCell.innerHTML = `
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
+                                <button class="expand-btn" onclick="toggleRow(${index})">+</button>
+                                <button class="identification-btn-small" onclick="runShapeIdentification('shape-row-1-${itemOrderLineNo}')" title="הפעל זיהוי צורה">
+                                    זיהוי
+                                </button>
+                            </div>
+                        `;
+
+                        // Handle both array format and object format
+                        if (Array.isArray(item)) {
+                            // Array format: [מס', סה"כ משקל, אורך, סה"כ יח', קוטר, הערות]
+                            row.insertCell(1).textContent = item[0] || (index + 1);  // מס'
+                            row.insertCell(2).textContent = '-';  // קטלוג - not available in array format
+
+                            // צורה column with template iframe (default template 210 for array format)
+                            const shapeCell = row.insertCell(3);
+                            const templateNumber = '210'; // Default template for array format
+
+                            if (templateNumber && templateNumber !== '-' && templateNumber !== '') {
+                                const templateUrl = `/shape_template/${templateNumber}`;
+                                shapeCell.innerHTML = `
+                                    <iframe src="${templateUrl}"
+                                            class="table-shape-image"
+                                            title=""
+                                            style="width: 50px; height: 40px; border: none; overflow: hidden; pointer-events: none;"
+                                            scrolling="no">
+                                    </iframe>
+                                `;
+                            } else {
+                                shapeCell.innerHTML = '<span>תבנית לא זמינה</span>';
+                            }
+
+                            row.insertCell(4).textContent = item[4] || '-';  // קוטר [mm]
+                            row.insertCell(5).textContent = item[3] || '1';  // סה"כ יח'
+                            row.insertCell(6).textContent = item[5] || '-';  // הערות
+
+                            // Add check button
+                            const checkCell = row.insertCell(7);
+                            checkCell.innerHTML = '<button class="check-btn">✓</button>';
+                        } else {
+                            // Object format (fallback)
+                            row.insertCell(1).textContent = item['מס\''] || item['מס'] || (index + 1);
+                            const catalogNumber = item['מספר קטלוגי'] || item['catalog'] || '-';
+                            row.insertCell(2).textContent = catalogNumber;
+
+                            // צורה column with template iframe
+                            const shapeCell = row.insertCell(3);
+
+                            if (catalogNumber && catalogNumber !== '-' && catalogNumber !== '') {
+                                const templateUrl = `/shape_template/${catalogNumber}`;
+                                shapeCell.innerHTML = `
+                                    <iframe src="${templateUrl}"
+                                            class="table-shape-image"
+                                            title=""
+                                            style="width: 50px; height: 40px; border: none; overflow: hidden; pointer-events: none;"
+                                            scrolling="no">
+                                    </iframe>
+                                `;
+                            } else {
+                                shapeCell.innerHTML = '<span>תבנית לא זמינה</span>';
+                            }
+
+                            row.insertCell(4).textContent = item['קוטר'] || item['קוטר [mm]'] || '-';
+                            row.insertCell(5).textContent = item['יחידות'] || item['units'] || item['כמות'] || item['סה"כ יח\''] || '1';
+                            row.insertCell(6).textContent = item['הערות'] || '-';
+
+                            // Add check button
+                            const checkCell = row.insertCell(7);
+                            checkCell.innerHTML = '<button class="check-btn">✓</button>';
+                        }
+                    });
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="8" class="no-data">אין נתונים להצגה</td></tr>';
+                }
+        } else {
+            console.log('[TABLE] ❌ Table tab is NOT active - clearing table and exiting');
+            // Clear table if not on table tab
             const tbody = document.getElementById('items-tbody');
-            tbody.innerHTML = '';
-            
-            // Use all_items if available, otherwise fall back to sample_items
-            const items = table.all_items || table.sample_items || [];
-            if (items.length > 0) {
-                
-                items.forEach((item, index) => {
-                    const row = tbody.insertRow();
-                    row.setAttribute('data-row-id', index);
-                    
-                    // Expand button and identification button
-                    const expandCell = row.insertCell(0);
-                    expandCell.innerHTML = `
-                        <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
-                            <button class="expand-btn" onclick="toggleRow(${index})">+</button>
-                            <button class="identification-btn-small" onclick="runShapeIdentification('shape-row-1-${index + 1}')" title="הפעל זיהוי צורה">
-                                זיהוי
-                            </button>
-                        </div>
-                    `;
-                    
-                    // Handle both array format and object format
-                    if (Array.isArray(item)) {
-                        // Array format: [מס', סה"כ משקל, אורך, סה"כ יח', קוטר, הערות]
-                        row.insertCell(1).textContent = item[0] || (index + 1);  // מס'
-                        row.insertCell(2).textContent = '-';  // קטלוג - not available in array format
-
-                        // צורה column with shape image
-                        const shapeCell = row.insertCell(3);
-                        const orderNumber = getCurrentOrderNumber();
-                        const rowNumber = index + 1;
-                        // For displayAnalysisData, assume page 1 as default
-                        const pageNumber = 1;
-
-                        if (orderNumber) {
-                            const imageUrl = `/api/shape-image/${orderNumber}/${pageNumber}/${rowNumber}`;
-                            shapeCell.innerHTML = `
-                                <img src="${imageUrl}"
-                                     alt="צורה ${rowNumber}"
-                                     class="table-shape-image"
-                                     title="צורה ${rowNumber} - לחץ להגדלה"
-                                     onclick="openImageModal('${imageUrl}', 'צורה ${rowNumber}', 'עמוד ${pageNumber}')"
-                                     onerror="this.innerHTML='<span>צורה לא זמינה</span>'"
-                                     style="max-width: 100%; max-height: 80px; object-fit: contain; cursor: pointer;">
-                            `;
-                        } else {
-                            shapeCell.innerHTML = '<span>צורה לא זמינה</span>';
-                        }
-
-                        row.insertCell(4).textContent = item[4] || '-';  // קוטר [mm]
-                        row.insertCell(5).textContent = item[3] || '1';  // סה"כ יח'
-                        row.insertCell(6).textContent = item[5] || '-';  // הערות
-
-                        // Add check button
-                        const checkCell = row.insertCell(7);
-                        checkCell.innerHTML = '<button class="check-btn">✓</button>';
-                    } else {
-                        // Object format (fallback)
-                        row.insertCell(1).textContent = item['מס\''] || item['מס'] || (index + 1);
-                        row.insertCell(2).textContent = item['מספר קטלוגי'] || item['catalog'] || '-';
-
-                        // צורה column with shape image
-                        const shapeCell = row.insertCell(3);
-                        const orderNumber = getCurrentOrderNumber();
-                        const rowNumber = index + 1;
-                        // For displayAnalysisData, assume page 1 as default
-                        const pageNumber = 1;
-
-                        if (orderNumber) {
-                            const imageUrl = `/api/shape-image/${orderNumber}/${pageNumber}/${rowNumber}`;
-                            shapeCell.innerHTML = `
-                                <img src="${imageUrl}"
-                                     alt="צורה ${rowNumber}"
-                                     class="table-shape-image"
-                                     title="צורה ${rowNumber} - לחץ להגדלה"
-                                     onclick="openImageModal('${imageUrl}', 'צורה ${rowNumber}', 'עמוד ${pageNumber}')"
-                                     onerror="this.innerHTML='<span>צורה לא זמינה</span>'"
-                                     style="max-width: 100%; max-height: 80px; object-fit: contain; cursor: pointer;">
-                            `;
-                        } else {
-                            shapeCell.innerHTML = '<span>צורה לא זמינה</span>';
-                        }
-
-                        row.insertCell(4).textContent = item['קוטר'] || item['קוטר [mm]'] || '-';
-                        row.insertCell(5).textContent = item['יחידות'] || item['units'] || item['כמות'] || item['סה"כ יח\''] || '1';
-                        row.insertCell(4).textContent = item['הערות'] || '-';
-
-                        // Add check button
-                        const checkCell = row.insertCell(5);
-                        checkCell.innerHTML = '<button class="check-btn">✓</button>';
-                    }
-                });
-                
+            if (tbody) {
+                tbody.innerHTML = '<tr><td colspan="8" class="no-data">בחר כרטיסית "טבלה" לצפות בנתונים</td></tr>';
+                console.log('[TABLE] Table cleared with placeholder message');
             } else {
-                tbody.innerHTML = '<tr><td colspan="8" class="no-data">אין נתונים להצגה</td></tr>';
+                console.log('[TABLE] No tbody element found to clear');
             }
         }
     }
@@ -851,6 +988,8 @@ function changeScale(delta) {
 
 // Switch between tabs
 function switchTab(tabName) {
+    console.log('[TAB SWITCH] Switching to tab:', tabName);
+
     // Update tab buttons
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.tab === tabName);
@@ -858,7 +997,9 @@ function switchTab(tabName) {
 
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.toggle('active', content.id === `${tabName}-tab`);
+        const isActive = content.id === `${tabName}-tab`;
+        content.classList.toggle('active', isActive);
+        console.log('[TAB SWITCH] Tab content', content.id, isActive ? 'activated' : 'deactivated');
     });
 
     // Handle shapes tab activation - populate with stored data
@@ -869,12 +1010,40 @@ function switchTab(tabName) {
             updateShapesDisplay(globalShapesData, globalCurrentPage);
         }, 50);
     }
+
+    // Handle table tab activation - repopulate table data
+    if (tabName === 'table') {
+        console.log('📊 Table tab activated - repopulating table data');
+        // Re-trigger the table population by calling displayAnalysisData if we have stored data
+        if (window.lastAnalysisData) {
+            setTimeout(() => {
+                displayAnalysisData(window.lastAnalysisData);
+            }, 50);
+        }
+    }
+
+    // Handle header tab activation - repopulate header data
+    if (tabName === 'header') {
+        console.log('📋 [HEADER TAB] Header tab activated - repopulating header data');
+        console.log('📋 [HEADER TAB] window.lastAnalysisData:', window.lastAnalysisData);
+        // Re-trigger the header population by calling displayAnalysisData if we have stored data
+        if (window.lastAnalysisData) {
+            console.log('📋 [HEADER TAB] Re-triggering displayAnalysisData...');
+            setTimeout(() => {
+                console.log('📋 [HEADER TAB] Executing displayAnalysisData with stored data');
+                displayAnalysisData(window.lastAnalysisData);
+            }, 50);
+        } else {
+            console.log('❌ [HEADER TAB] No stored analysis data available');
+        }
+    }
 }
 
 // Shapes table is now populated by updateShapesDisplay() function (Version 15 format)
 
 // Update page displays
 function updatePageDisplays(pageNumber) {
+    console.log(`[UPDATE PAGE DISPLAYS] Called with page ${pageNumber}`);
     // Update the title page display
     const titlePageDisplay = document.getElementById('title-page-display');
     if (titlePageDisplay) {
@@ -882,29 +1051,38 @@ function updatePageDisplays(pageNumber) {
     }
 
     // Update table data for current page
+    console.log(`[UPDATE PAGE DISPLAYS] About to call updateTableForCurrentPage(${pageNumber})`);
     updateTableForCurrentPage(pageNumber);
 }
 
 // Filter and display table OCR data for specific page
 function updateTableForCurrentPage(pageNumber) {
+    console.log(`[API FETCH] ✅ NEW FIX ACTIVE - Fetching data for page ${pageNumber}`);
     // Fetch table OCR data from the new API endpoint
     fetch(`/api/table-ocr/${pageNumber}`)
         .then(response => response.json())
         .then(data => {
+            console.log(`[TABLE API] Received data for page ${pageNumber}:`, data);
             if (data.success) {
+                console.log(`[TABLE API] Success! Processing ${data.rows.length} rows`);
                 // Transform the OCR data format to match our table structure
-                const transformedItems = data.rows.map(row => ({
-                    'מס': row['מס'] || row['row_number'] || '',
-                    'קטלוג': row['קטלוג'] || '-', // Catalog number from database
-                    'shape': row['shape'] || '-', // Shape information for צורה column
-                    'קוטר': row['קוטר'] || '-',
-                    'סהכ יחידות': row['סהכ יחידות'] || '-',
-                    'אורך': row['אורך'] || '-',
-                    'משקל': row['משקל'] || '-',
-                    'הערות': row['הערות'] || '-',
-                    'checked': row['checked'] || false  // Use checked status from database
-                }));
+                const transformedItems = data.rows.map((row, index) => {
+                    const transformed = {
+                        'מס': row['מס'] || row['row_number'] || '',
+                        'קטלוג': row['קטלוג'] || '-', // Catalog number from database
+                        'shape': row['shape'] || '-', // Shape information for צורה column
+                        'קוטר': row['קוטר'] || '-',
+                        'סהכ יחידות': row['סהכ יחידות'] || '-',
+                        'אורך': row['אורך'] || '-',
+                        'משקל': row['משקל'] || '-',
+                        'הערות': row['הערות'] || '-',
+                        'checked': row['checked'] || false  // Use checked status from database
+                    };
+                    console.log(`[TABLE API] Row ${index + 1} transformed:`, transformed);
+                    return transformed;
+                });
 
+                console.log(`[TABLE API] Calling displayTableItems with ${transformedItems.length} items`);
                 displayTableItems(transformedItems, pageNumber);
             } else {
 
@@ -979,8 +1157,30 @@ function refreshCurrentTableData() {
     }
 }
 
+// Refresh a specific row after shape identification
+function refreshSpecificRow(rowId) {
+    console.log(`🔄 Refreshing specific row: ${rowId}`);
+
+    // Extract page number and line number from rowId (format: shape-row-{page}-{line})
+    const parts = rowId.split('-');
+    if (parts.length < 4) {
+        console.error('Invalid rowId format:', rowId);
+        return;
+    }
+
+    const pageNumber = parseInt(parts[2]);
+    const lineNumber = parts[3];
+
+    console.log(`🔄 Refreshing page ${pageNumber}, line ${lineNumber}`);
+
+    // Reload the entire table data for the current page
+    updateTableForCurrentPage(pageNumber);
+}
+
 // Display table items in the UI
 function displayTableItems(items, pageNumber) {
+    console.log(`[DISPLAY TABLE] FUNCTION CALLED with ${items.length} items for page ${pageNumber}`);
+    console.log(`[DISPLAY TABLE] Items received:`, items);
     const tbody = document.getElementById('items-tbody');
     if (!tbody) {
         console.log('❌ Table body not found');
@@ -992,17 +1192,26 @@ function displayTableItems(items, pageNumber) {
     if (items.length > 0) {
         console.log(`📊 Displaying ${items.length} items for page ${pageNumber}`);
 
+        // Template fix applied - visual test removed
+
         items.forEach((item, index) => {
             const row = tbody.insertRow();
             row.setAttribute('data-row-id', index);
             row.setAttribute('data-page', pageNumber);
+
+            // Store the actual order line number as data attribute for later use
+            const orderLineNo = Array.isArray(item)
+                ? (item[0] || (index + 1))
+                : (item['מס'] || item['מס\''] || (index + 1));
+            row.setAttribute('data-order-line-no', orderLineNo);
+            console.log(`[ROW CREATED] Page ${pageNumber}, Index ${index}, Order Line No: ${orderLineNo}`);
 
             // Expand button and identification button
             const expandCell = row.insertCell(0);
             expandCell.innerHTML = `
                 <div style="display: flex; flex-direction: column; align-items: center; gap: 2px;">
                     <button class="expand-btn" onclick="toggleRow(${index})">+</button>
-                    <button class="identification-btn-small" onclick="runShapeIdentification('shape-row-${pageNumber}-${index + 1}')" title="הפעל זיהוי צורה">
+                    <button class="identification-btn-small" onclick="runShapeIdentification('shape-row-${pageNumber}-${orderLineNo}')" title="הפעל זיהוי צורה">
                         זיהוי
                     </button>
                 </div>
@@ -1033,8 +1242,8 @@ function displayTableItems(items, pageNumber) {
                         this.setAttribute('data-original-value', this.value);
 
                         // If catalog field is updated, also update it in shapes section
-                        if (fieldName === 'קטלוג') {
-                            const rowId = `shape-row-${pageNumber}-${index + 1}`;
+                        if (fieldName === 'catalog') {
+                            const rowId = `shape-row-${pageNumber}-${orderLineNo}`;
                             const shapeCatalogInput = document.getElementById(`catalog-input-${rowId}`);
                             if (shapeCatalogInput) {
                                 shapeCatalogInput.value = this.value;
@@ -1043,6 +1252,9 @@ function displayTableItems(items, pageNumber) {
 
                             // Immediately update expanded table if this row is expanded
                             updateExpandedTablesForRow(pageNumber, index, this.value);
+
+                            // Update the shape field (צורה column) with new shape template
+                            updateShapeFieldForCatalog(index, this.value);
                         }
                     }
                 });
@@ -1061,26 +1273,54 @@ function displayTableItems(items, pageNumber) {
             if (Array.isArray(item)) {
                 // Array format: [מס', סה"כ משקל, אורך, סה"כ יח', קוטר, הערות]
                 createEditableCell(item[0] || (index + 1), 'מס');
-                createEditableCell('-', 'קטלוג');  // קטלוג - not available in array format
+                createEditableCell('-', 'catalog');  // catalog - not available in array format
 
-                // צורה column with shape image
+                // צורה column with shape image - DIRECT TEMPLATE LOADING
                 const shapeCell = row.insertCell();
                 const orderNumber = getCurrentOrderNumber();
-                const rowNumber = index + 1;
 
-                if (orderNumber) {
-                    const imageUrl = `/api/shape-image/${orderNumber}/${pageNumber}/${rowNumber}`;
+                // Get the actual order line number from the item data (not array position)
+                const orderLineNo = item['מס'] || item['מס\''] || (index + 1);
+
+                // Get catalog number from the item data and map to available templates
+                const rawCatalogNumber = Array.isArray(item) ? null : (item['קטלוג'] || item['catalog'] || item['shape']);
+
+                // Map shape numbers to available templates
+                const templateMap = {
+                    '210': '210',
+                    '220': '210', // fallback to 210
+                    '218': '218',
+                    '104': '104',
+                    '107': '107',
+                    '000': '000'
+                };
+
+                const catalogNumber = templateMap[rawCatalogNumber] || rawCatalogNumber;
+                console.log(`[DISPLAY TABLE] 🎯 TEMPLATE MAPPING - Raw: ${rawCatalogNumber} -> Mapped: ${catalogNumber} (item:`, item, ')');
+
+                // Template mapping working - debug styling removed
+
+                // Create iframe directly like the working extended area code
+                if (catalogNumber && catalogNumber !== 'NA' && catalogNumber !== '-') {
+                    console.log(`[DISPLAY TABLE] 🎯 Creating template iframe for catalog ${catalogNumber}`);
+
+                    // Create iframe directly in the cell to show the template with proper centering
+                    // Use orderLineNo (actual line number from data) instead of array position
+                    const templateUrl = `/shape_template/${catalogNumber}?order=${orderNumber}&page=${pageNumber}&line=${orderLineNo}`;
                     shapeCell.innerHTML = `
-                        <img src="${imageUrl}"
-                             alt="צורה ${rowNumber}"
-                             class="table-shape-image"
-                             title="צורה ${rowNumber} - לחץ להגדלה"
-                             onclick="openImageModal('${imageUrl}', 'צורה ${rowNumber}', 'עמוד ${pageNumber}')"
-                             onerror="this.innerHTML='<span>צורה לא זמינה</span>'"
-                             style="max-width: 100%; max-height: 80px; object-fit: contain; cursor: pointer;">
+                        <div style="width: 100%; height: 110px; overflow: hidden; position: relative; background: white;">
+                            <iframe src="${templateUrl}"
+                                    style="width: 600px; height: 350px; border: none; position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%) scale(0.7);"
+                                    scrolling="no"
+                                    title="Template ${catalogNumber}">
+                            </iframe>
+                        </div>
                     `;
+
+                    console.log(`[DISPLAY TABLE] ✅ Template iframe created for catalog ${catalogNumber}`);
                 } else {
-                    shapeCell.innerHTML = '<span>צורה לא זמינה</span>';
+                    console.log(`[DISPLAY TABLE] 🎯 No valid catalog for shape cell: ${catalogNumber} (condition failed)`);
+                    shapeCell.innerHTML = `<div style="color: gray; font-size: 10px; text-align: center;">אין קטלוג</div>`;
                 }
 
                 createEditableCell(item[4] || '-', 'קוטר');
@@ -1089,26 +1329,54 @@ function displayTableItems(items, pageNumber) {
             } else {
                 // Object format - now handles OCR data structure properly
                 createEditableCell(item['מס'] || item['מס\''] || (index + 1), 'מס');
-                createEditableCell(item['קטלוג'] || item['catalog'] || '-', 'קטלוג');
+                createEditableCell(item['קטלוג'] || item['catalog'] || '-', 'catalog');
 
-                // צורה column with shape image
+                // צורה column with shape image - DIRECT TEMPLATE LOADING
                 const shapeCell = row.insertCell();
                 const orderNumber = getCurrentOrderNumber();
-                const rowNumber = index + 1;
 
-                if (orderNumber) {
-                    const imageUrl = `/api/shape-image/${orderNumber}/${pageNumber}/${rowNumber}`;
+                // Get the actual order line number from the item data (not array position)
+                const orderLineNo = item['מס'] || item['מס\''] || (index + 1);
+
+                // Get catalog number from the item data and map to available templates
+                const rawCatalogNumber = Array.isArray(item) ? null : (item['קטלוג'] || item['catalog'] || item['shape']);
+
+                // Map shape numbers to available templates
+                const templateMap = {
+                    '210': '210',
+                    '220': '210', // fallback to 210
+                    '218': '218',
+                    '104': '104',
+                    '107': '107',
+                    '000': '000'
+                };
+
+                const catalogNumber = templateMap[rawCatalogNumber] || rawCatalogNumber;
+                console.log(`[DISPLAY TABLE] 🎯 TEMPLATE MAPPING - Raw: ${rawCatalogNumber} -> Mapped: ${catalogNumber} (item:`, item, ')');
+
+                // Template mapping working - debug styling removed
+
+                // Create iframe directly like the working extended area code
+                if (catalogNumber && catalogNumber !== 'NA' && catalogNumber !== '-') {
+                    console.log(`[DISPLAY TABLE] 🎯 Creating template iframe for catalog ${catalogNumber}`);
+
+                    // Create iframe directly in the cell to show the template with proper centering
+                    // Use orderLineNo (actual line number from data) instead of array position
+                    const templateUrl = `/shape_template/${catalogNumber}?order=${orderNumber}&page=${pageNumber}&line=${orderLineNo}`;
                     shapeCell.innerHTML = `
-                        <img src="${imageUrl}"
-                             alt="צורה ${rowNumber}"
-                             class="table-shape-image"
-                             title="צורה ${rowNumber} - לחץ להגדלה"
-                             onclick="openImageModal('${imageUrl}', 'צורה ${rowNumber}', 'עמוד ${pageNumber}')"
-                             onerror="this.innerHTML='<span>צורה לא זמינה</span>'"
-                             style="max-width: 100%; max-height: 80px; object-fit: contain; cursor: pointer;">
+                        <div style="width: 100%; height: 110px; overflow: hidden; position: relative; background: white;">
+                            <iframe src="${templateUrl}"
+                                    style="width: 600px; height: 350px; border: none; position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%) scale(0.7);"
+                                    scrolling="no"
+                                    title="Template ${catalogNumber}">
+                            </iframe>
+                        </div>
                     `;
+
+                    console.log(`[DISPLAY TABLE] ✅ Template iframe created for catalog ${catalogNumber}`);
                 } else {
-                    shapeCell.innerHTML = '<span>צורה לא זמינה</span>';
+                    console.log(`[DISPLAY TABLE] 🎯 No valid catalog for shape cell: ${catalogNumber} (condition failed)`);
+                    shapeCell.innerHTML = `<div style="color: gray; font-size: 10px; text-align: center;">אין קטלוג</div>`;
                 }
 
                 createEditableCell(item['קוטר'] || '-', 'קוטר');
@@ -1282,12 +1550,8 @@ async function updateShapesDisplay(items, pageNumber) {
                         <input type="text" class="rib-field rib-count" maxlength="2" style="width: 40px;" placeholder="מס׳ צלעות">
                     </div>
                 </td>
-                <td class="shape-drawing-cell">
-                    <img src="${image.url}" alt="צורה ${index + 1}"
-                         class="shape-table-image"
-                         title="צורה ${index + 1} - לחץ להגדלה"
-                         onclick="openImageModal('${image.url}', 'צורה ${index + 1}', 'עמוד ${pageNumber}')"
-                         onerror="this.style.display='none'">
+                <td class="shape-drawing-cell" id="shape-cell-${rowId}">
+                    <!-- Template iframe will be loaded here based on catalog data -->
                 </td>
                 <td class="shape-catalog-cell" id="catalog-image-${rowId}">
                     <div class="catalog-shape-placeholder">
@@ -1376,6 +1640,9 @@ async function updateShapesDisplay(items, pageNumber) {
             shapesBody.appendChild(ribRow1);
             shapesBody.appendChild(ribRow2);
 
+            // Load template iframe based on catalog data from JSON
+            loadShapeTemplateFromJSON(pageNumber, index + 1, rowId);
+
             // Add event listener for catalog input and set initial value
             const catalogInput = document.getElementById(`catalog-input-${rowId}`);
             // Set the catalog value from the item data if available
@@ -1391,7 +1658,7 @@ async function updateShapesDisplay(items, pageNumber) {
             catalogInput.addEventListener('input', function() {
                 updateCatalogImage(this.value, rowId);
                 // Also update the catalog number in the orders table
-                saveTableCell(pageNumber, index, 'קטלוג', this.value);
+                saveTableCell(pageNumber, index, 'catalog', this.value);
 
                 // Update the catalog field in the orders table
                 const tbody = document.getElementById('items-tbody');
@@ -1540,7 +1807,10 @@ async function toggleCheckStatus(pageNumber, lineNumber, checked, buttonElement)
     try {
         // Get the current order number
         const orderNumber = getCurrentOrderNumber();
+        console.log('[DEBUG CHECK] Order number:', orderNumber);
+        console.log('[DEBUG CHECK] Current data:', currentData);
         if (!orderNumber) {
+            console.error('[DEBUG CHECK] No order number found!');
             alert('לא נמצא מספר הזמנה');
             return;
         }
@@ -1572,18 +1842,24 @@ async function toggleCheckStatus(pageNumber, lineNumber, checked, buttonElement)
         buttonElement.title = checked ? 'הסר סימון' : 'סמן כבדוק';
 
         // Send update to server with current screen data
+        const requestData = {
+            order_number: orderNumber,
+            page_number: pageNumber,
+            line_number: lineNumber,
+            checked: checked
+        };
+        console.log('[DEBUG CHECK] Sending request with:', requestData);
+        console.log('[DEBUG CHECK] orderNumber:', orderNumber);
+        console.log('[DEBUG CHECK] pageNumber:', pageNumber);
+        console.log('[DEBUG CHECK] lineNumber:', lineNumber);
+        console.log('[DEBUG CHECK] checked:', checked);
+
         const response = await fetch('/api/update-checked-status', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                orderNumber: orderNumber,
-                pageNumber: pageNumber,
-                lineNumber: lineNumber,
-                checked: checked,
-                rowData: rowData  // Add the current screen data
-            })
+            body: JSON.stringify(requestData)
         });
 
         if (!response.ok) {
@@ -1685,16 +1961,16 @@ async function updateCatalogNumber(pageNumber, lineNumber, catalogNumber) {
             return;
         }
 
-        const response = await fetch('/api/update-catalog-number', {
+        const response = await fetch('/api/update-table-cell', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                orderNumber: orderNumber,
-                pageNumber: pageNumber,
-                lineNumber: lineNumber,
-                catalogNumber: catalogNumber
+                page: pageNumber,
+                row_index: lineNumber - 1,  // Convert to 0-based index
+                field_name: 'catalog',
+                new_value: catalogNumber
             })
         });
 
@@ -1740,22 +2016,15 @@ async function toggleRow(rowId) {
         return;
     }
 
-    // Only refresh when expanding (not collapsing)
-    console.log(`🔄 TOGGLE: Auto-refreshing table data before expanding row ${rowId}`);
+    // Refresh disabled - proceeding directly with expansion
+    console.log(`🔄 TOGGLE: Proceeding with expansion (refresh disabled)`);
 
-    // Wait for refresh to complete, then proceed with expansion
-    await new Promise(resolve => {
-        refreshCurrentTableData();
-        // Wait a bit for refresh to process
-        setTimeout(resolve, 1000);
-    });
-
-    // Re-get elements after refresh (they might have been recreated)
+    // Get elements directly (no refresh needed)
     const refreshedTbody = document.getElementById('items-tbody');
     const refreshedRow = refreshedTbody.querySelector(`tr[data-row-id="${rowId}"]`);
     const refreshedExpandBtn = refreshedRow.querySelector('.expand-btn');
 
-    console.log(`🔄 TOGGLE: After refresh - proceeding with expansion`);
+    console.log(`🔄 TOGGLE: Proceeding with expansion`);
 
     // Get the catalog number from the refreshed row (assuming it's in the 3rd cell - קטלוג column)
     console.log(`🔄 TOGGLE: Getting catalog number from refreshed row, cells:`, refreshedRow.cells);
@@ -1808,11 +2077,6 @@ async function toggleRow(rowId) {
                             </tr>
                         </tbody>
                     </table>
-                </div>
-                <div class="shape-template-section">
-                    <div class="template-content" id="shape-template-${rowId}">
-                        ${generateShapeTemplate(catalogNumber)}
-                    </div>
                 </div>
             </div>
         `;
@@ -2769,36 +3033,37 @@ function formatDate(dateString) {
 }
 
 // Auto-refresh every 30 seconds (but preserve shape images)
-setInterval(() => {
-    if (document.getElementById('status').textContent !== 'מעבד') {
-        // Store current shape table state before refresh
-        const shapesTable = document.getElementById('shapes-table');
-        const shapesBody = document.getElementById('shapes-tbody');
-        const currentShapeRows = shapesBody ? shapesBody.innerHTML : '';
-        const currentPageAttr = shapesTable ? shapesTable.getAttribute('data-current-page') : null;
-
-        loadLatestAnalysis().then(() => {
-            // Restore shapes if they were cleared
-            if (currentShapeRows && currentShapeRows !== '' &&
-                !currentShapeRows.includes('no-shapes-placeholder')) {
-                const tbody = document.getElementById('shapes-tbody');
-                const table = document.getElementById('shapes-table');
-                if (tbody) {
-                    // Check if shapes were cleared or changed
-                    const newContent = tbody.innerHTML;
-                    if (newContent.includes('no-shapes-placeholder') || newContent === '') {
-                        // Restore the shape rows
-                        tbody.innerHTML = currentShapeRows;
-                        if (currentPageAttr && table) {
-                            table.setAttribute('data-current-page', currentPageAttr);
-                        }
-                        console.log('📐 Restored shape table after auto-refresh');
-                    }
-                }
-            }
-        });
-    }
-}, 30000);
+// Auto-refresh disabled
+// setInterval(() => {
+//     if (document.getElementById('status').textContent !== 'מעבד') {
+//         // Store current shape table state before refresh
+//         const shapesTable = document.getElementById('shapes-table');
+//         const shapesBody = document.getElementById('shapes-tbody');
+//         const currentShapeRows = shapesBody ? shapesBody.innerHTML : '';
+//         const currentPageAttr = shapesTable ? shapesTable.getAttribute('data-current-page') : null;
+//
+//         loadLatestAnalysis().then(() => {
+//             // Restore shapes if they were cleared
+//             if (currentShapeRows && currentShapeRows !== '' &&
+//                 !currentShapeRows.includes('no-shapes-placeholder')) {
+//                 const tbody = document.getElementById('shapes-tbody');
+//                 const table = document.getElementById('shapes-table');
+//                 if (tbody) {
+//                     // Check if shapes were cleared or changed
+//                     const newContent = tbody.innerHTML;
+//                     if (newContent.includes('no-shapes-placeholder') || newContent === '') {
+//                         // Restore the shape rows
+//                         tbody.innerHTML = currentShapeRows;
+//                         if (currentPageAttr && table) {
+//                             table.setAttribute('data-current-page', currentPageAttr);
+//                         }
+//                         console.log('📐 Restored shape table after auto-refresh');
+//                     }
+//                 }
+//             }
+//         });
+//     }
+// }, 30000);
 
 // Area Selection Functions
 function initializeSelectionCanvas() {
@@ -3579,11 +3844,10 @@ async function saveTableCell(pageNumber, rowIndex, fieldName, newValue) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                orderNumber: orderNumber,
-                pageNumber: pageNumber,
-                rowIndex: rowIndex,
-                fieldName: fieldName,
-                value: newValue
+                page: pageNumber,
+                row_index: rowIndex,
+                field_name: fieldName,
+                new_value: newValue
             })
         });
 
@@ -3605,11 +3869,14 @@ async function saveTableCell(pageNumber, rowIndex, fieldName, newValue) {
             }
 
             // Update expanded table if catalog field was changed
-            if (fieldName === 'קטלוג') {
+            if (fieldName === 'catalog') {
                 // Call Form1dat2 API to update catalog data in central output file
                 updateCatalogNumber(pageNumber, rowIndex + 1, newValue);
 
                 updateExpandedTablesForRow(pageNumber, rowIndex, newValue);
+
+                // Update the shape field (צורה column) with new shape template
+                updateShapeFieldForCatalog(rowIndex, newValue);
             }
 
             console.log('✅ Table cell saved successfully');
@@ -3839,6 +4106,61 @@ function updateCatalogImage(catalogNumber, rowId) {
     }
 }
 
+// Update shape field when catalog number changes
+function updateShapeFieldForCatalog(rowIndex, catalogNumber) {
+    console.log(`[SHAPE UPDATE] Called updateShapeFieldForCatalog with rowIndex: ${rowIndex}, catalogNumber: ${catalogNumber}`);
+
+    const tbody = document.getElementById('items-tbody');
+    if (!tbody) {
+        console.log(`[SHAPE UPDATE] Error: tbody not found`);
+        return;
+    }
+
+    if (!tbody.rows[rowIndex]) {
+        console.log(`[SHAPE UPDATE] Error: row at index ${rowIndex} not found. Total rows: ${tbody.rows.length}`);
+        return;
+    }
+
+    const row = tbody.rows[rowIndex];
+    console.log(`[SHAPE UPDATE] Found row, total cells: ${row.cells.length}`);
+
+    // Shape column is the 4th column (index 3) in the orders table
+    const shapeCell = row.cells[3];
+
+    if (!shapeCell) {
+        console.log(`[SHAPE UPDATE] Error: shape cell at index 3 not found`);
+        return;
+    }
+
+    console.log(`[SHAPE UPDATE] Found shape cell, current content: ${shapeCell.innerHTML}`);
+
+    if (catalogNumber && catalogNumber !== '-' && catalogNumber !== '') {
+        // Get order number and page number from the current context
+        const orderNumber = getCurrentOrderNumber();
+        const pageNumber = getCurrentPageNumber();
+
+        // Get the order line number from the row's data attribute (stored when row was created)
+        const orderLineNo = row.getAttribute('data-order-line-no') || (rowIndex + 1);
+        console.log(`[SHAPE UPDATE] Row index ${rowIndex}, Order Line No from data-attr: ${orderLineNo}`);
+
+        // Create new shape template iframe with URL parameters for auto-population
+        const templateUrl = `/shape_template/${catalogNumber}?order=${orderNumber}&page=${pageNumber}&line=${orderLineNo}`;
+        const newContent = `
+                        <div style="width: 100%; height: 110px; overflow: hidden; position: relative; background: white;">
+                            <iframe src="${templateUrl}" style="width: 600px; height: 350px; border: none; position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%) scale(0.7);" scrolling="no" title="Template ${catalogNumber}">
+                            </iframe>
+                        </div>
+        `;
+        shapeCell.innerHTML = newContent;
+        console.log(`[SHAPE UPDATE] Updated shape field for row ${rowIndex + 1} with catalog ${catalogNumber} (order=${orderNumber}, page=${pageNumber}, line=${orderLineNo})`);
+    } else {
+        // No catalog number - show placeholder
+        const placeholderContent = '<span style="color: #666; font-size: 12px;">אין קטלוג זמין</span>';
+        shapeCell.innerHTML = placeholderContent;
+        console.log(`[SHAPE UPDATE] Set placeholder content: ${placeholderContent}`);
+    }
+}
+
 // ============================================
 // Catalog Shape Modal Functions (Legacy - now handled by shape-modals.js)
 // ============================================
@@ -3896,7 +4218,9 @@ function runShapeIdentification(rowId) {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            row_id: rowId
+            row_id: rowId,
+            order_number: getCurrentOrderNumber(),
+            timestamp: new Date().toISOString()
         })
     })
     .then(response => response.json())
@@ -3918,8 +4242,9 @@ function runShapeIdentification(rowId) {
                 shapesStatus.textContent = `הושלם - ${data.values_updated} ערכים`;
             }
 
-            // Optionally refresh the expanded row to show updated values
+            // Refresh the specific row to show updated values
             console.log('Mappings found:', data.mappings);
+            refreshSpecificRow(rowId);
 
             // Auto-hide notification after 3 seconds
             setTimeout(() => {
@@ -3998,7 +4323,7 @@ function loadIdentifiedShapes() {
             <td>${shape.catalog}</td>
             <td>
                 <div class="shape-drawing-cell">
-                    <img src="/static/images/shapes/${shape.drawing}"
+                    <img src="/shape_image/${shape.drawing}"
                          alt="ציור צורה"
                          class="shape-drawing-image"
                          onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
@@ -4022,4 +4347,199 @@ function loadIdentifiedShapes() {
     if (totalShapes) {
         totalShapes.textContent = identifiedShapes.length;
     }
+}
+
+// Load shape template iframe from JSON data for detected shapes
+async function loadShapeTemplateFromJSON(pageNumber, lineNumber, rowId) {
+    try {
+        const orderNumber = getCurrentOrderNumber();
+        if (!orderNumber) {
+            console.log(`[LOAD TEMPLATE JSON] No order number available`);
+            return;
+        }
+
+        // Get the catalog number from the JSON analysis data
+        const response = await fetch(`/api/latest-analysis`);
+        const analysisData = await response.json();
+
+        if (!analysisData.analysis || !analysisData.analysis.section_3_shape_analysis) {
+            console.log(`[LOAD TEMPLATE JSON] No shape analysis data found`);
+            return;
+        }
+
+        const pageKey = `page_${pageNumber}`;
+        const shapeAnalysis = analysisData.analysis.section_3_shape_analysis[pageKey];
+
+        if (!shapeAnalysis || !shapeAnalysis.order_lines) {
+            console.log(`[LOAD TEMPLATE JSON] No data for page ${pageNumber}`);
+            return;
+        }
+
+        // Find the line by line_number (not order_line_no)
+        let catalogNumber = null;
+        for (const lineKey in shapeAnalysis.order_lines) {
+            const lineData = shapeAnalysis.order_lines[lineKey];
+            if (lineData.line_number === lineNumber) {
+                catalogNumber = lineData.shape_catalog_number;
+                break;
+            }
+        }
+
+        if (!catalogNumber || catalogNumber === 'NA' || catalogNumber === '-') {
+            console.log(`[LOAD TEMPLATE JSON] No valid catalog number for page ${pageNumber}, line ${lineNumber}`);
+            // Show placeholder
+            const shapeCell = document.getElementById(`shape-cell-${rowId}`);
+            if (shapeCell) {
+                shapeCell.innerHTML = '<span style="color: #666; font-size: 12px;">אין קטלוג זמין</span>';
+            }
+            return;
+        }
+
+        console.log(`[LOAD TEMPLATE JSON] Found catalog number ${catalogNumber} for page ${pageNumber}, line ${lineNumber}`);
+
+        // Load the template iframe
+        const shapeCell = document.getElementById(`shape-cell-${rowId}`);
+        if (shapeCell) {
+            const templateUrl = `/shape_template/${catalogNumber}`;
+            shapeCell.innerHTML = `
+                <iframe src="${templateUrl}"
+                        class="table-shape-image"
+                        title=""
+                        style="width: 50px; height: 40px; border: none; overflow: hidden; pointer-events: none;"
+                        scrolling="no">
+                </iframe>
+            `;
+            console.log(`[LOAD TEMPLATE JSON] Template iframe loaded for catalog ${catalogNumber}`);
+        }
+
+    } catch (error) {
+        console.error(`[LOAD TEMPLATE JSON] Error loading template:`, error);
+        const shapeCell = document.getElementById(`shape-cell-${rowId}`);
+        if (shapeCell) {
+            shapeCell.innerHTML = '<span style="color: #999; font-size: 12px;">שגיאה בטעינה</span>';
+        }
+    }
+}
+
+// Load shape template iframe for main order table - SIMPLIFIED VERSION
+function loadOrderTableTemplate(shapeCell, lineNumber, pageNumber, catalogNumber = null) {
+    console.log(`[TEMPLATE] Called with line ${lineNumber}, page ${pageNumber}, catalog ${catalogNumber}`);
+
+    // If catalog number is provided directly, use it
+    if (catalogNumber && catalogNumber !== 'NA' && catalogNumber !== '-' && catalogNumber !== '000') {
+        console.log(`[TEMPLATE] Loading template for catalog ${catalogNumber}`);
+        const templateUrl = `/shape_template/${catalogNumber}`;
+        shapeCell.innerHTML = `
+            <iframe src="${templateUrl}"
+                    class="table-shape-image"
+                    title=""
+                    style="width: 50px; height: 40px; border: none; overflow: hidden; pointer-events: none;"
+                    scrolling="no">
+            </iframe>
+        `;
+        console.log(`[TEMPLATE] Template iframe created for catalog ${catalogNumber}`);
+        return;
+    }
+
+    // Fallback: Hard-coded mapping for testing if no catalog provided
+    const catalogMappings = {
+        '1': '210',  // Line 1 -> Shape 210
+        '3': '218'   // Line 3 -> Shape 218
+    };
+
+    const fallbackCatalog = catalogMappings[String(lineNumber)];
+
+    if (fallbackCatalog) {
+        console.log(`[TEMPLATE] Loading fallback template for catalog ${fallbackCatalog}`);
+        const templateUrl = `/shape_template/${fallbackCatalog}`;
+        shapeCell.innerHTML = `
+            <iframe src="${templateUrl}"
+                    class="table-shape-image"
+                    title=""
+                    style="width: 50px; height: 40px; border: none; overflow: hidden; pointer-events: none;"
+                    scrolling="no">
+            </iframe>
+        `;
+        console.log(`[TEMPLATE] Fallback template iframe created for catalog ${fallbackCatalog}`);
+    } else {
+        console.log(`[TEMPLATE] No catalog available for line ${lineNumber}`);
+        shapeCell.innerHTML = '<span style="color: #666; font-size: 12px;">אין קטלוג</span>';
+    }
+}
+
+// DEBUG: Test function for the button in main page
+function testTemplateLoading() {
+    console.log('[DEBUG] Test template loading button clicked');
+    const testDiv = document.getElementById('debug-template-test');
+    if (testDiv) {
+        console.log('[DEBUG] Test div found, calling loadOrderTableTemplate');
+        loadOrderTableTemplate(testDiv, 1, 1);  // Test with line 1 (should load shape 210)
+    } else {
+        console.log('[DEBUG] Test div not found');
+    }
+}
+
+// DEBUG: Function to add templates to existing table
+function addTemplatesToExistingTable() {
+    console.log('[DEBUG] Adding templates to existing table - FUNCTION CALLED');
+    alert('[DEBUG] Button clicked! Check console for details.');
+
+    const tbody = document.getElementById('items-tbody');
+    if (!tbody) {
+        console.log('[DEBUG] Table body not found');
+        alert('[DEBUG] Table body not found!');
+        return;
+    }
+
+    console.log('[DEBUG] Table body found:', tbody);
+
+    const rows = tbody.querySelectorAll('tr');
+    console.log(`[DEBUG] Found ${rows.length} rows`);
+    alert(`[DEBUG] Found ${rows.length} rows in table`);
+
+    if (rows.length === 0) {
+        console.log('[DEBUG] No rows found in table');
+        alert('[DEBUG] No rows found in table');
+        return;
+    }
+
+    rows.forEach((row, index) => {
+        const cells = row.querySelectorAll('td');
+        console.log(`[DEBUG] Row ${index} has ${cells.length} cells`);
+
+        if (cells.length >= 3) {  // Make sure there are enough cells
+            // Log all cell contents to find the right columns
+            console.log(`[DEBUG] Row ${index} all cells:`,
+                Array.from(cells).map((cell, i) => `Cell ${i}: "${cell?.textContent?.trim()}"`));
+
+            // Try to find line number in different columns
+            let lineNumber = null;
+            let lineCell = null;
+            let shapeCell = null;
+
+            // Check columns 0, 1, 2 for line numbers (should be numeric)
+            for (let i = 0; i < Math.min(cells.length, 4); i++) {
+                const cellText = cells[i]?.textContent?.trim();
+                if (cellText && /^\d+$/.test(cellText)) {  // Check if it's a number
+                    lineNumber = cellText;
+                    lineCell = cells[i];
+                    // Shape cell should be nearby (try next column)
+                    shapeCell = cells[i + 1] || cells[i + 2];
+                    console.log(`[DEBUG] Found line number "${lineNumber}" in column ${i}`);
+                    break;
+                }
+            }
+
+            if (lineNumber && shapeCell) {
+                console.log(`[DEBUG] Adding template for line ${lineNumber}`);
+                loadOrderTableTemplate(shapeCell, lineNumber, 1);
+            } else {
+                console.log(`[DEBUG] Skipping row ${index} - no valid line number found`);
+            }
+        } else {
+            console.log(`[DEBUG] Row ${index} has insufficient cells (${cells.length})`);
+        }
+    });
+
+    console.log('[DEBUG] Template addition process completed');
 }

@@ -104,11 +104,17 @@
                         פרטי הזמנה <span id="title-page-display" style="background: blue; color: white; padding: 3px 6px; border-radius: 8px; font-size: 12px; margin-right: 20px;">עמוד -</span>
                     </h2>
                 </div>
-                <div class="data-tabs">
-                    <button class="tab-btn" data-tab="header">כותרת</button>
-                    <button class="tab-btn active" data-tab="table">טבלת הזמנות</button>
-                    <button class="tab-btn" data-tab="shapes">צורות</button>
-                    <button class="tab-btn" data-tab="raw">נתונים גולמיים</button>
+                <div class="data-tabs" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; gap: 5px;">
+                        <button class="tab-btn" data-tab="header">כותרת</button>
+                        <button class="tab-btn active" data-tab="table">טבלת הזמנות</button>
+                        <button class="tab-btn" data-tab="shapes">צורות</button>
+                        <button class="tab-btn" data-tab="raw">נתונים גולמיים</button>
+                    </div>
+                    <button id="refresh-table-btn" class="btn btn-small btn-primary" title="רענן נתוני טבלה" style="margin: 0;">
+                        <span class="btn-icon">🔄</span>
+                        רענן נתונים
+                    </button>
                 </div>
             </div>
             
@@ -172,17 +178,18 @@
             <!-- Table Tab Content -->
             <div id="table-tab" class="tab-content active">
                 <div class="data-section">
+
                     <div class="table-container">
                         <table id="items-table">
                             <thead>
                                 <tr>
                                     <th width="4%"></th>
                                     <th width="6%">מס'</th>
-                                    <th width="10%">קטלוג</th>
-                                    <th width="30%">צורה</th>
+                                    <th width="8%">קטלוג</th>
+                                    <th width="40%" style="text-align: center;">צורה</th>
                                     <th width="10%">קוטר (mm)</th>
                                     <th width="10%">יחידות</th>
-                                    <th width="24%">הערות</th>
+                                    <th width="16%">הערות</th>
                                     <th width="6%">בדוק</th>
                                 </tr>
                             </thead>
@@ -192,12 +199,6 @@
                                 </tr>
                             </tbody>
                         </table>
-                    </div>
-                    <div class="table-controls" style="text-align: center; margin: 10px 0;">
-                        <button id="refresh-table-btn" class="btn btn-small btn-primary" title="רענן נתוני טבלה">
-                            <span class="btn-icon">🔄</span>
-                            רענן נתונים
-                        </button>
                     </div>
                     <div class="table-summary">
                         <div class="summary-item">

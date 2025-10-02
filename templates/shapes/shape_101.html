@@ -1,30 +1,19 @@
 
-        <div id="shape-104" class="shape-content">
+        <div id="shape-101" class="shape-content">
             <div class="shape-diagram-with-input" style="position: relative; text-align: center; padding: 40px 0;">
 
-                <!-- Original catalog shape 104 image -->
+                <!-- Original catalog shape 101 image -->
                 <div style="text-align: center; margin-top: 20px; position: relative; display: inline-block;">
-                    <img src="shape_images/shape_104.png"
-                         alt="Shape 104"
+                    <img src="shape_images/shape_101.png"
+                         alt="Shape 101"
                          style="width: 200px; height: 150px; border-radius: 8px; padding: 20px; background-color: white; object-fit: contain;">
                     <!-- A field positioned relative to the image border -->
-                    <div style="position: absolute; bottom: 95px; left: 65px;">
+                    <div style="position: absolute; bottom: 60px; left: 93px;">
                         <input type="text"
-                               id="length-field_A-104"
+                               id="length-field_A-101"
                                name="A"
-                               class="inline-shape-input shape-104-input rib-input"
+                               class="inline-shape-input shape-101-input rib-input"
                                data-rib-letter="A"
-                               maxlength="8"
-                               value="0"
-                               style="width: 60px; height: 20px; font-size: 13px; color: blue; border: none; border-radius: 0px; background: white; text-align: left;">
-                    </div>
-                    <!-- C field positioned relative to the image border -->
-                    <div style="position: absolute; bottom: 45px; left: 90px;">
-                        <input type="text"
-                               id="length-field_C-104"
-                               name="C"
-                               class="inline-shape-input shape-104-input rib-input"
-                               data-rib-letter="C"
                                maxlength="8"
                                value="0"
                                style="width: 60px; height: 20px; font-size: 13px; color: blue; border: none; border-radius: 0px; background: white; text-align: center;">
@@ -45,15 +34,15 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success && data.rib_values) {
-                        console.log('[SHAPE 104] Auto-populating rib values:', data.rib_values);
+                        console.log('[SHAPE 101] Auto-populating rib values:', data.rib_values);
                         document.querySelectorAll('.rib-input').forEach(input => {
                             const letter = input.dataset.ribLetter;
                             // Only populate if value exists and is not empty/zero string
                             if (letter && data.rib_values[letter] && data.rib_values[letter] !== '' && data.rib_values[letter] !== '0') {
                                 input.value = data.rib_values[letter];
-                                console.log(`[SHAPE 104] Set ${letter} = ${data.rib_values[letter]}`);
+                                console.log(`[SHAPE 101] Set ${letter} = ${data.rib_values[letter]}`);
                             } else {
-                                console.log(`[SHAPE 104] Skipping ${letter} (empty or zero value)`);
+                                console.log(`[SHAPE 101] Skipping ${letter} (empty or zero value)`);
                             }
                         });
 
@@ -62,7 +51,7 @@
                             input.addEventListener('blur', function() {
                                 const letter = this.dataset.ribLetter;
                                 const value = this.value;
-                                console.log(`[SHAPE 104] Saving ${letter} = ${value}`);
+                                console.log(`[SHAPE 101] Saving ${letter} = ${value}`);
 
                                 fetch('/api/update-rib-value', {
                                     method: 'POST',
@@ -78,16 +67,16 @@
                                 .then(response => response.json())
                                 .then(result => {
                                     if (result.success) {
-                                        console.log(`[SHAPE 104] Successfully saved ${letter} = ${value}`);
+                                        console.log(`[SHAPE 101] Successfully saved ${letter} = ${value}`);
                                     } else {
-                                        console.error(`[SHAPE 104] Failed to save:`, result.error);
+                                        console.error(`[SHAPE 101] Failed to save:`, result.error);
                                     }
                                 })
-                                .catch(error => console.error(`[SHAPE 104] Error saving:`, error));
+                                .catch(error => console.error(`[SHAPE 101] Error saving:`, error));
                             });
                         });
                     }
                 })
-                .catch(error => console.error('[SHAPE 104] Error loading rib data:', error));
+                .catch(error => console.error('[SHAPE 101] Error loading rib data:', error));
         })();
         </script>

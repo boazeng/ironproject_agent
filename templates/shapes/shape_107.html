@@ -1,43 +1,104 @@
 
         <div id="shape-107" class="shape-content">
             <div class="shape-diagram-with-input" style="position: relative; text-align: center; padding: 40px 0;">
-                <!-- Standalone input field -->
-                <div style="position: absolute; top: 62.9%; left: 75.0%; transform: translate(-50%, -50%);">
-                    <input type="text"
-                           id="length-field_1-107"
-                           class="inline-shape-input shape-107-input"
-                           maxlength="8"
-                           placeholder="0"
-                           style="width: 80px; height: 28px; font-size: 18px; border: 2px solid #4a90e2; border-radius: 4px; background: #e6f2ff;">
-                </div>
-                <!-- Standalone input field -->
-                <div style="position: absolute; top: 51.6%; left: 27.1%; transform: translate(-50%, -50%);">
-                    <input type="text"
-                           id="length-field_2-107"
-                           class="inline-shape-input shape-107-input"
-                           maxlength="8"
-                           placeholder="0"
-                           style="width: 80px; height: 28px; font-size: 18px; border: 2px solid #4a90e2; border-radius: 4px; background: #e6f2ff;">
-                </div>
-                <!-- Standalone input field -->
-                <div style="position: absolute; top: 76.7%; left: 50.0%; transform: translate(-50%, -50%);">
-                    <input type="text"
-                           id="length-field_3-107"
-                           class="inline-shape-input shape-107-input"
-                           maxlength="8"
-                           placeholder="0"
-                           style="width: 80px; height: 28px; font-size: 18px; border: 2px solid #4a90e2; border-radius: 4px; background: #e6f2ff;">
-                </div>
 
                 <!-- Original catalog shape 107 image -->
-                <div style="text-align: center; margin-top: 20px;">
-                    <img src="/static/images/shape_107.png?v=2024092403"
+                <div style="text-align: center; margin-top: 20px; position: relative; display: inline-block;">
+                    <img src="shape_images/shape_107.png"
                          alt="Shape 107"
-                         style="max-width: 300px; height: auto; border: 2px solid #ddd; border-radius: 8px; padding: 20px; background-color: white;">
+                         style="width: 200px; height: 150px; border-radius: 8px; padding: 20px; background-color: white; object-fit: contain;">
+                    <!-- A field positioned relative to the image border -->
+                    <div style="position: absolute; bottom: 60px; left: 175px;">
+                        <input type="text"
+                               id="length-field_A-107"
+                               name="A"
+                               class="inline-shape-input shape-107-input rib-input"
+                               data-rib-letter="A"
+                               maxlength="8"
+                               value="0"
+                               style="width: 60px; height: 20px; font-size: 13px; color: blue; border: none; border-radius: 0px; background: white; text-align: left;">
+                    </div>
+                    <!-- C field positioned relative to the image border -->
+                    <div style="position: absolute; bottom: 30px; left: 92px;">
+                        <input type="text"
+                               id="length-field_C-107"
+                               name="C"
+                               class="inline-shape-input shape-107-input rib-input"
+                               data-rib-letter="C"
+                               maxlength="8"
+                               value="0"
+                               style="width: 60px; height: 20px; font-size: 13px; color: blue; border: none; border-radius: 0px; background: white; text-align: center;">
+                    </div>
+                    <!-- E field positioned relative to the image border -->
+                    <div style="position: absolute; bottom: 85px; left: 10px;">
+                        <input type="text"
+                               id="length-field_E-107"
+                               name="E"
+                               class="inline-shape-input shape-107-input rib-input"
+                               data-rib-letter="E"
+                               maxlength="8"
+                               value="0"
+                               style="width: 60px; height: 20px; font-size: 13px; color: blue; border: none; border-radius: 0px; background: white; text-align: right;">
+                    </div>
                 </div>
             </div>
-            <div class="modal-buttons" style="margin-top: 30px;">
-                <button id="save-shape-107" class="btn btn-success" onclick="saveShape('107')">שמור</button>
-            </div>
         </div>
-    
+
+        <script>
+        // Auto-populate rib values from central JSON
+        (function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const orderNumber = urlParams.get('order') || 'CO25S006375';
+            const pageNum = urlParams.get('page') || '1';
+            const lineNum = urlParams.get('line') || '1';
+
+            fetch(`/api/rib-data/${orderNumber}/${pageNum}/${lineNum}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.rib_values) {
+                        console.log('[SHAPE 107] Auto-populating rib values:', data.rib_values);
+                        document.querySelectorAll('.rib-input').forEach(input => {
+                            const letter = input.dataset.ribLetter;
+                            // Only populate if value exists and is not empty/zero string
+                            if (letter && data.rib_values[letter] && data.rib_values[letter] !== '' && data.rib_values[letter] !== '0') {
+                                input.value = data.rib_values[letter];
+                                console.log(`[SHAPE 107] Set ${letter} = ${data.rib_values[letter]}`);
+                            } else {
+                                console.log(`[SHAPE 107] Skipping ${letter} (empty or zero value)`);
+                            }
+                        });
+
+                        // Add blur event listeners to save changes
+                        document.querySelectorAll('.rib-input').forEach(input => {
+                            input.addEventListener('blur', function() {
+                                const letter = this.dataset.ribLetter;
+                                const value = this.value;
+                                console.log(`[SHAPE 107] Saving ${letter} = ${value}`);
+
+                                fetch('/api/update-rib-value', {
+                                    method: 'POST',
+                                    headers: {'Content-Type': 'application/json'},
+                                    body: JSON.stringify({
+                                        order_number: orderNumber,
+                                        page_number: pageNum,
+                                        line_number: lineNum,
+                                        rib_letter: letter,
+                                        value: value
+                                    })
+                                })
+                                .then(response => response.json())
+                                .then(result => {
+                                    if (result.success) {
+                                        console.log(`[SHAPE 107] Successfully saved ${letter} = ${value}`);
+                                    } else {
+                                        console.error(`[SHAPE 107] Failed to save:`, result.error);
+                                    }
+                                })
+                                .catch(error => console.error(`[SHAPE 107] Error saving:`, error));
+                            });
+                        });
+                    }
+                })
+                .catch(error => console.error('[SHAPE 107] Error loading rib data:', error));
+        })();
+        </script>
