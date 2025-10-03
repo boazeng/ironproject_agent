@@ -173,8 +173,10 @@ function setupEventListeners() {
     });
     
     // PDF controls
+    document.getElementById('pdf-first').addEventListener('click', onFirstPage);
     document.getElementById('pdf-prev').addEventListener('click', onPrevPage);
     document.getElementById('pdf-next').addEventListener('click', onNextPage);
+    document.getElementById('pdf-last').addEventListener('click', onLastPage);
     document.getElementById('pdf-zoom-in').addEventListener('click', () => changeScale(0.2));
     document.getElementById('pdf-zoom-out').addEventListener('click', () => changeScale(-0.2));
     document.getElementById('area-select-btn').addEventListener('click', toggleAreaSelection);
@@ -195,6 +197,12 @@ function setupEventListeners() {
     const refreshTableBtn = document.getElementById('refresh-table-btn');
     if (refreshTableBtn) {
         refreshTableBtn.addEventListener('click', refreshCurrentTableData);
+    }
+
+    // Shape detection button
+    const detectShapesBtn = document.getElementById('detect-shapes-btn');
+    if (detectShapesBtn) {
+        detectShapesBtn.addEventListener('click', runShapeDetection);
     }
 
     // Header action buttons (removed)
@@ -978,6 +986,20 @@ function onNextPage() {
     queueRenderPage(pageNum);
 }
 
+// First page
+function onFirstPage() {
+    pageNum = 1;
+    queueRenderPage(pageNum);
+}
+
+// Last page
+function onLastPage() {
+    if (pdfDoc) {
+        pageNum = pdfDoc.numPages;
+        queueRenderPage(pageNum);
+    }
+}
+
 // Change zoom scale
 function changeScale(delta) {
     scale = Math.max(0.5, Math.min(3.0, scale + delta));
@@ -1411,7 +1433,9 @@ function displayTableItems(items, pageNumber) {
             checkButton.addEventListener('click', function() {
                 const currentChecked = this.getAttribute('data-checked') === 'true';
                 const newChecked = !currentChecked;
-                toggleCheckStatus(pageNumber, index + 1, newChecked, this);
+                // Use the actual order_line_no from the item data, not the screen index
+                const orderLineNo = item['מס\''] || item['מס'] || item['order_line_no'] || (index + 1);
+                toggleCheckStatus(pageNumber, orderLineNo, newChecked, this);
                 this.setAttribute('data-checked', newChecked);
             });
 
@@ -1854,10 +1878,13 @@ async function toggleCheckStatus(pageNumber, lineNumber, checked, buttonElement)
         console.log('[DEBUG CHECK] lineNumber:', lineNumber);
         console.log('[DEBUG CHECK] checked:', checked);
 
-        const response = await fetch('/api/update-checked-status', {
+        // Use v3 endpoint to bypass aggressive browser caching
+        const response = await fetch('/api/update-checked-status-v3', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Cache-Control': 'no-cache',
+                'Pragma': 'no-cache'
             },
             body: JSON.stringify(requestData)
         });
@@ -4542,4 +4569,116 @@ function addTemplatesToExistingTable() {
     });
 
     console.log('[DEBUG] Template addition process completed');
+}
+
+// Run Shape Detection - זיהוי צורות
+async function runShapeDetection() {
+    const btn = document.getElementById('detect-shapes-btn');
+    const originalHTML = btn.innerHTML;
+
+    console.log('[SHAPE DETECTION] Starting shape detection...');
+
+    try {
+        // Disable button and show loading state
+        btn.disabled = true;
+        btn.innerHTML = '<span class="btn-icon">⏳</span>מזהה...';
+
+        // Show initial notification
+        const detectionId = 'shape-detection-' + Date.now();
+        createProgressNotification(
+            detectionId,
+            'זיהוי צורות אוטומטי',
+            'מתחיל תהליך זיהוי צורות...',
+            'processing'
+        );
+
+        // Get current order number
+        const orderNumber = getCurrentOrderNumber();
+
+        // Call API
+        const response = await fetch('/api/run-shape-detection', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                order_number: orderNumber
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            // Update notification with stages
+            const stages = result.stages;
+            let stageMessages = [];
+
+            if (stages.skeleton_analyzer) {
+                stageMessages.push('✓ ניתוח שלד');
+            }
+            if (stages.shape_to_yolo_table) {
+                stageMessages.push('✓ יצירת טבלת YOLO');
+            }
+            if (stages.yolo_detection) {
+                stageMessages.push('✓ זיהוי YOLO');
+            }
+
+            const ribUpdates = result.rib_configuration_updates;
+            const summaryMessage = `
+                זוהו ${result.database_updates} צורות
+                <br>עודכנו ${ribUpdates.successful} תצורות צלעות
+                ${ribUpdates.failed > 0 ? '<br>נכשלו: ' + ribUpdates.failed : ''}
+                ${ribUpdates.skipped > 0 ? '<br>דולגו: ' + ribUpdates.skipped : ''}
+            `;
+
+            updateProgressNotification(
+                detectionId,
+                'זיהוי צורות הושלם בהצלחה',
+                summaryMessage,
+                'success'
+            );
+
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                removeProgressNotification(detectionId);
+            }, 5000);
+
+            // Refresh the page data
+            console.log('[SHAPE DETECTION] Refreshing page data...');
+            await loadLatestAnalysis();
+
+        } else {
+            // Error
+            updateProgressNotification(
+                detectionId,
+                'שגיאה בזיהוי צורות',
+                result.error || 'שגיאה לא ידועה',
+                'error'
+            );
+
+            // Auto-hide error after 10 seconds
+            setTimeout(() => {
+                removeProgressNotification(detectionId);
+            }, 10000);
+        }
+
+    } catch (error) {
+        console.error('[SHAPE DETECTION] Error:', error);
+
+        createProgressNotification(
+            'shape-detection-error',
+            'שגיאה בזיהוי צורות',
+            error.message || 'שגיאה בחיבור לשרת',
+            'error'
+        );
+
+        setTimeout(() => {
+            removeProgressNotification('shape-detection-error');
+        }, 10000);
+
+    } finally {
+        // Reset button
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
 }

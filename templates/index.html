@@ -58,11 +58,13 @@
                         <span class="btn-icon">📁</span>
                         בחר קובץ
                     </button>
-                    <button id="pdf-prev" class="btn-small">◀</button>
+                    <button id="pdf-last" class="btn-small" title="עמוד אחרון">◀◀</button>
+                    <button id="pdf-next" class="btn-small">◀</button>
                     <span class="page-info">
                         עמוד <span id="page-num">1</span> מתוך <span id="page-count">1</span>
                     </span>
-                    <button id="pdf-next" class="btn-small">▶</button>
+                    <button id="pdf-prev" class="btn-small">▶</button>
+                    <button id="pdf-first" class="btn-small" title="עמוד ראשון">▶▶</button>
                     <button id="pdf-zoom-in" class="btn-small">🔍+</button>
                     <button id="pdf-zoom-out" class="btn-small">🔍-</button>
                     <button id="area-select-btn" class="btn-small btn-toggle" title="בחירת אזור">📐</button>
@@ -111,10 +113,16 @@
                         <button class="tab-btn" data-tab="shapes">צורות</button>
                         <button class="tab-btn" data-tab="raw">נתונים גולמיים</button>
                     </div>
-                    <button id="refresh-table-btn" class="btn btn-small btn-primary" title="רענן נתוני טבלה" style="margin: 0;">
-                        <span class="btn-icon">🔄</span>
-                        רענן נתונים
-                    </button>
+                    <div style="display: flex; gap: 5px;">
+                        <button id="detect-shapes-btn" class="btn btn-small btn-primary" title="הפעל זיהוי צורות אוטומטי" style="margin: 0;">
+                            <span class="btn-icon">🔍</span>
+                            זיהוי צורות
+                        </button>
+                        <button id="refresh-table-btn" class="btn btn-small btn-primary" title="רענן נתוני טבלה" style="margin: 0;">
+                            <span class="btn-icon">🔄</span>
+                            רענן נתונים
+                        </button>
+                    </div>
                 </div>
             </div>
             

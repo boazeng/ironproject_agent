@@ -89,8 +89,8 @@
 
 .inline-shape-input:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+    border-color: #333;
+    box-shadow: none;
 }
 
 .shape-diagram {
@@ -132,7 +132,7 @@
 
 .shape-input:focus {
     outline: none;
-    border-color: #667eea;
+    border-color: #333;
 }
 
 .shape-info {
@@ -531,8 +531,8 @@ body {
 
 .data-editable:focus {
     outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    border-color: #333;
+    box-shadow: none;
     background: #f8fafc;
 }
 
@@ -876,9 +876,9 @@ tr:hover:not(.expanded-row) {
 }
 
 .inline-shape-input {
-    border: 2px solid #4a90e2 !important;
+    border: 2px solid #333 !important;
     border-radius: 4px !important;
-    background: #e6f2ff !important;
+    background: white !important;
     font-size: 16px !important;
     text-align: center;
     padding: 4px 8px;
@@ -888,7 +888,7 @@ tr:hover:not(.expanded-row) {
 
 .inline-shape-input:focus {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.3);
+    box-shadow: none;
 }
 
 .shape-content img {
@@ -1208,8 +1208,8 @@ tr:hover:not(.expanded-row) {
 
 .catalog-input:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+    border-color: #333;
+    box-shadow: none;
 }
 
 .catalog-input:invalid {
@@ -1328,8 +1328,8 @@ tr:hover:not(.expanded-row) {
 
 .column-input:focus {
     outline: none;
-    border-color: #007bff;
-    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    border-color: #333;
+    box-shadow: none;
 }
 
 /* Column information styles */
@@ -2160,7 +2160,7 @@ tr:hover:not(.expanded-row) {
 
 .rib-field:focus {
     outline: none;
-    border-color: #4CAF50;
+    border-color: #333;
     background: #f9f9f9;
 }
 
@@ -2396,4 +2396,104 @@ tr:hover:not(.expanded-row) {
     cursor: not-allowed;
     transform: none !important;
     box-shadow: 0 1px 4px rgba(102, 126, 234, 0.2);
+}
+
+/* COMPREHENSIVE BORDER REMOVAL - NO BORDERS, BLUE TEXT, MATCH TABLE FONT SIZE */
+input[type="text"],
+input,
+.inline-shape-input,
+input.inline-shape-input,
+div input[type="text"],
+*[class*="shape-input"],
+*[class*="inline-input"] {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: blue !important;
+    background: transparent !important;
+    font-size: 13px !important;
+}
+
+/* Override focus states for all input variations - no borders, blue text, match table font size */
+input[type="text"]:focus,
+input:focus,
+.inline-shape-input:focus,
+input.inline-shape-input:focus,
+div input[type="text"]:focus,
+*[class*="shape-input"]:focus,
+*[class*="inline-input"]:focus {
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
+    color: blue !important;
+    background: transparent !important;
+    font-size: 13px !important;
+}
+
+/* Table shape images - much wider and shorter - OVERRIDE ALL OTHER SHAPE-IMAGE RULES */
+img.table-shape-image,
+.table-shape-image {
+    width: auto !important;
+    max-width: 400px !important;
+    height: auto !important;
+    max-height: 120px !important;
+    min-width: unset !important;
+    object-fit: contain !important;
+    border: 1px solid #dee2e6 !important;
+    border-radius: 4px !important;
+    background: white !important;
+    cursor: pointer !important;
+}
+
+/* Override the conflicting shape-image rule specifically for table images */
+img.table-shape-image.shape-image {
+    max-width: 400px !important;
+    width: auto !important;
+    height: auto !important;
+    max-height: 120px !important;
+}
+
+/* FORCE WIDER IMAGES - NUCLEAR OPTION - TARGET ALL SHAPE IMAGE CLASSES */
+.shape-table-image, .table-shape-image,
+img.shape-table-image, img.table-shape-image,
+img[class*="table-shape-image"], img[class*="shape-table-image"],
+img[class*="shape-image"], img[src*="shape_"] {
+    min-width: 150px !important;
+    width: 200px !important;
+    max-width: 200px !important;
+    height: auto !important;
+    max-height: 120px !important;
+    object-fit: contain !important;
+}
+
+/* OVERRIDE CONFLICTING SHAPE-IMAGE RULE FOR TABLE IMAGES */
+img.shape-table-image.shape-image,
+.shape-table-image.shape-image,
+img.table-shape-image.shape-image,
+.table-shape-image.shape-image {
+    max-width: 200px !important;
+    width: 200px !important;
+    height: auto !important;
+}
+
+/* MAIN TABLE ORDER IMAGES - VERY SMALL FOR TABLE LAYOUT */
+img.table-shape-image,
+.table-shape-image {
+    width: 50px !important;
+    max-width: 50px !important;
+    height: auto !important;
+    max-height: 40px !important;
+    object-fit: contain !important;
+}
+
+/* CATALOG/TEMPLATE IMAGES - MODERATELY WIDER */
+img.catalog-table-image,
+.catalog-table-image,
+.shape-template-image,
+img.shape-template-image {
+    width: 200px !important;
+    max-width: 200px !important;
+    height: auto !important;
+    max-height: 120px !important;
+    object-fit: contain !important;
 }

@@ -117,6 +117,8 @@ def get_rib_data(page_number, line_number):
     }), 410  # 410 Gone - indicates resource is permanently unavailable
 
 @ribs_bp.route('/api/update-checked-status', methods=['POST'])
+@ribs_bp.route('/api/update-checked-status-v2', methods=['POST'])
+@ribs_bp.route('/api/update-checked-status-v3', methods=['POST'])
 def update_checked_status():
     """Update the checked status of a specific line"""
     try:
@@ -180,10 +182,14 @@ def update_checked_status():
         with open(output_file_path, 'w', encoding='utf-8') as f:
             json.dump(full_data, f, ensure_ascii=False, indent=2)
 
-        return jsonify({
+        response = jsonify({
             'success': True,
             'message': f'Checked status updated for line {line_number}'
         })
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+        return response
 
     except Exception as e:
         print(f"[ERROR] Exception in update_checked_status: {repr(e)}")
